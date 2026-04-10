@@ -5,13 +5,11 @@ Use this file when you need the JSON input format or reusable SVG implementation
 ## CLI
 
 ```bash
-SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram"
+# SKILL_DIR must be resolved before running — see SKILL.md for details.
 python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
   "$SKILL_DIR/assets/example-spec.json" \
   /absolute/path/to/output.svg
 ```
-
-If the skill was provided with an explicit filesystem path, use that path as `SKILL_DIR` instead of assuming the default install location.
 
 ## Minimal Spec
 

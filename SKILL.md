@@ -7,34 +7,19 @@ description: Create or revise standalone SVG flowcharts, process maps, architect
 
 Create standalone SVG diagrams with dashed animated flow connectors and a sketchy visual system inspired by Excalidraw.
 
-## Quick Start
+## SKILL_DIR — resolve this FIRST
 
-1. Translate the request into a diagram spec: canvas size, groups, nodes, edges, and notes.
-2. Use the bundled renderer at the skill path when building a fresh diagram or iterating on layout several times.
-3. Patch the SVG directly only for small label, spacing, or color edits.
-4. Open references only when needed:
-- `references/style-guide.md` for palette, typography, node, and motion rules
-- `references/svg-recipes.md` for the JSON spec format and reusable SVG patterns
+**IMPORTANT:** All file paths in this skill are relative to the directory containing this `SKILL.md` file. Do NOT resolve them from your current working directory.
 
-Treat all paths in this skill as relative to the skill directory, not the caller's current working directory.
+Set `SKILL_DIR` to the **absolute path of the directory containing this SKILL.md file** before reading any other file in this skill. For example, if this file was loaded from `/home/user/.codex/skills/svg-flow-diagram/SKILL.md`, then `SKILL_DIR=/home/user/.codex/skills/svg-flow-diagram`.
 
-**Resolving `SKILL_DIR`** — use the first method that works:
+If you cannot determine the path this file was loaded from, search these locations and use the first that exists:
 
-1. If the agent provided an explicit skill path when invoking this file, use that path.
-2. Derive it from the absolute path of this `SKILL.md` file itself (strip the filename to get the directory).
-3. As a last resort, search common skill install locations:
-   - `${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram`
-   - `$HOME/.claude/skills/svg-flow-diagram`
-   - `$HOME/.opencode/skills/svg-flow-diagram`
+- `${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram`
+- `$HOME/.claude/skills/svg-flow-diagram`
+- `$HOME/.opencode/skills/svg-flow-diagram`
 
-In shell commands, resolve `SKILL_DIR` like this:
-
-```bash
-# Prefer the directory containing this SKILL.md
-SKILL_DIR="$(cd "$(dirname "<path-to-this-SKILL.md>")" && pwd)"
-```
-
-If the absolute path to this file is not available from context, use the search fallback:
+In shell:
 
 ```bash
 SKILL_DIR=""
@@ -44,6 +29,15 @@ for d in "${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram" \
   [ -d "$d" ] && SKILL_DIR="$d" && break
 done
 ```
+
+## Quick Start
+
+1. Translate the request into a diagram spec: canvas size, groups, nodes, edges, and notes.
+2. Use the bundled renderer at `$SKILL_DIR/scripts/render_flow_svg.py` when building a fresh diagram or iterating on layout several times.
+3. Patch the SVG directly only for small label, spacing, or color edits.
+4. Open references only when needed:
+- `$SKILL_DIR/references/style-guide.md` for palette, typography, node, and motion rules
+- `$SKILL_DIR/references/svg-recipes.md` for the JSON spec format and reusable SVG patterns
 
 ## Workflow
 
@@ -159,15 +153,15 @@ Supported edge fields:
 
 Open only what matters for the current task:
 
-- `references/style-guide.md`
-- `references/svg-recipes.md`
+- `$SKILL_DIR/references/style-guide.md`
+- `$SKILL_DIR/references/svg-recipes.md`
 
 ## Assets
 
 Reuse bundled assets as starting points:
 
-- `"$SKILL_DIR/assets/example-spec.json"` for script input
-- `"$SKILL_DIR/assets/base-template.svg"` for quick copy-edit workflows
+- `$SKILL_DIR/assets/example-spec.json` for script input
+- `$SKILL_DIR/assets/base-template.svg` for quick copy-edit workflows
 
 ## Guardrails
 

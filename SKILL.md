@@ -10,11 +10,13 @@ Create standalone SVG diagrams with dashed animated flow connectors and a sketch
 ## Quick Start
 
 1. Translate the request into a diagram spec: canvas size, groups, nodes, edges, and notes.
-2. Use `scripts/render_flow_svg.py` when building a fresh diagram or iterating on layout several times.
+2. Use the bundled renderer at the skill path when building a fresh diagram or iterating on layout several times.
 3. Patch the SVG directly only for small label, spacing, or color edits.
 4. Open references only when needed:
 - `references/style-guide.md` for palette, typography, node, and motion rules
 - `references/svg-recipes.md` for the JSON spec format and reusable SVG patterns
+
+Treat all paths in this skill as relative to the skill directory, not the caller's current working directory. If the skill was invoked with an explicit path, use that path as `SKILL_DIR`. Otherwise, resolve it from `${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram`.
 
 ## Workflow
 
@@ -95,10 +97,22 @@ Before handing off:
 Render from a JSON spec with:
 
 ```bash
-python3 "$CODEX_HOME/skills/svg-flow-diagram/scripts/render_flow_svg.py" spec.json output.svg
+SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram"
+python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
+  "$SKILL_DIR/assets/example-spec.json" \
+  /absolute/path/to/output.svg
 ```
 
-Use the example spec at `assets/example-spec.json` as the starter format.
+When the user supplies an explicit skill path, prefer that exact location:
+
+```bash
+SKILL_DIR="/absolute/path/to/svg-flow-diagram"
+python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
+  "$SKILL_DIR/assets/example-spec.json" \
+  /absolute/path/to/output.svg
+```
+
+Use the example spec at `"$SKILL_DIR/assets/example-spec.json"` as the starter format.
 
 Supported top-level fields:
 
@@ -134,8 +148,8 @@ Open only what matters for the current task:
 
 Reuse bundled assets as starting points:
 
-- `assets/example-spec.json` for script input
-- `assets/base-template.svg` for quick copy-edit workflows
+- `"$SKILL_DIR/assets/example-spec.json"` for script input
+- `"$SKILL_DIR/assets/base-template.svg"` for quick copy-edit workflows
 
 ## Guardrails
 

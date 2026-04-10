@@ -1,6 +1,6 @@
 ---
 name: svg-flow-diagram
-description: Create or revise standalone SVG flowcharts, process maps, architecture diagrams, and pipeline diagrams with dashed animated flow lines and an Excalidraw-like hand-drawn visual language. Use when Codex needs raw `.svg` output rather than Mermaid, HTML, or Figma, especially for requests mentioning SVG flowcharts, node-link diagrams, flowing connectors, animated pipelines, or Extradraw/Excalidraw-style visuals.
+description: Create or revise standalone SVG flowcharts, process maps, architecture diagrams, and pipeline diagrams with dashed animated flow lines and an Excalidraw-like hand-drawn visual language. Use when the agent needs raw `.svg` output rather than Mermaid, HTML, or Figma, especially for requests mentioning SVG flowcharts, node-link diagrams, flowing connectors, animated pipelines, or Extradraw/Excalidraw-style visuals.
 ---
 
 # SVG Flow Diagram
@@ -16,7 +16,34 @@ Create standalone SVG diagrams with dashed animated flow connectors and a sketch
 - `references/style-guide.md` for palette, typography, node, and motion rules
 - `references/svg-recipes.md` for the JSON spec format and reusable SVG patterns
 
-Treat all paths in this skill as relative to the skill directory, not the caller's current working directory. If the skill was invoked with an explicit path, use that path as `SKILL_DIR`. Otherwise, resolve it from `${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram`.
+Treat all paths in this skill as relative to the skill directory, not the caller's current working directory.
+
+**Resolving `SKILL_DIR`** — use the first method that works:
+
+1. If the agent provided an explicit skill path when invoking this file, use that path.
+2. Derive it from the absolute path of this `SKILL.md` file itself (strip the filename to get the directory).
+3. As a last resort, search common skill install locations:
+   - `${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram`
+   - `$HOME/.claude/skills/svg-flow-diagram`
+   - `$HOME/.opencode/skills/svg-flow-diagram`
+
+In shell commands, resolve `SKILL_DIR` like this:
+
+```bash
+# Prefer the directory containing this SKILL.md
+SKILL_DIR="$(cd "$(dirname "<path-to-this-SKILL.md>")" && pwd)"
+```
+
+If the absolute path to this file is not available from context, use the search fallback:
+
+```bash
+SKILL_DIR=""
+for d in "${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram" \
+         "$HOME/.claude/skills/svg-flow-diagram" \
+         "$HOME/.opencode/skills/svg-flow-diagram"; do
+  [ -d "$d" ] && SKILL_DIR="$d" && break
+done
+```
 
 ## Workflow
 
@@ -97,16 +124,7 @@ Before handing off:
 Render from a JSON spec with:
 
 ```bash
-SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram"
-python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
-  "$SKILL_DIR/assets/example-spec.json" \
-  /absolute/path/to/output.svg
-```
-
-When the user supplies an explicit skill path, prefer that exact location:
-
-```bash
-SKILL_DIR="/absolute/path/to/svg-flow-diagram"
+# Resolve SKILL_DIR (see "Resolving SKILL_DIR" above), then:
 python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
   "$SKILL_DIR/assets/example-spec.json" \
   /absolute/path/to/output.svg

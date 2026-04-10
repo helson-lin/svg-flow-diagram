@@ -1,0 +1,4 @@
+interface:
+  display_name: "SVG Flow Diagram"
+  short_description: "Create styled SVG flowcharts with dashed animated connectors"
+  default_prompt: "Use $svg-flow-diagram to create an Excalidraw-like SVG flowchart with dashed animated flow connectors and offset edge labels."

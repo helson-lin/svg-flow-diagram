@@ -1,0 +1,266 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="860" viewBox="0 0 1480 860" role="img" aria-labelledby="diagram-title diagram-subtitle">
+  <title id="diagram-title">Insight Delivery Flow</title>
+  <desc id="diagram-subtitle">Signal intake -&gt; scoring -&gt; routing</desc>
+  <defs>
+    <pattern id="paper-dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="var(--grid)" opacity="0.45" />
+      <circle cx="16" cy="12" r="0.8" fill="var(--grid)" opacity="0.28" />
+      <circle cx="10" cy="22" r="0.9" fill="var(--grid)" opacity="0.22" />
+    </pattern>
+    <marker id="pipe-arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 2 2 L 10 6 L 2 10" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+  </defs>
+  <style>
+    :root {
+      --bg-paper: #FCFBF7;
+      --ink: #2D2926;
+      --muted: #7A6F66;
+      --grid: #E8E1D7;
+      --sand: #FFF0CF;
+      --mint: #DFF7E8;
+      --sky: #DCEBFF;
+      --coral: #FFE0D7;
+      --amber: #FFE8B5;
+      --graphite: #EAE6E1;
+      --flow-mint: #24B36B;
+      --flow-sky: #2F7CF6;
+      --flow-coral: #F36B3C;
+      --flow-amber: #D79210;
+      --font-hand: Virgil, "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+      --font-sans: "Avenir Next", "Segoe UI", sans-serif;
+    }
+
+    .canvas-bg {
+      fill: var(--bg-paper);
+    }
+
+    .canvas-grain {
+      fill: url(#paper-dots);
+    }
+
+    .title {
+      fill: var(--ink);
+      font-family: var(--font-hand);
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      fill: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .group-frame {
+      fill: none;
+      stroke: var(--grid);
+      stroke-width: 2;
+      stroke-dasharray: 10 12;
+    }
+
+    .group-title {
+      fill: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .node-fill {
+      stroke: none;
+    }
+
+    .node-stroke {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .node-stroke.ghost {
+      opacity: 0.38;
+    }
+
+    .node-label {
+      fill: var(--ink);
+      font-family: var(--font-hand);
+      font-size: 18px;
+      font-weight: 600;
+      text-anchor: middle;
+    }
+
+    .node-caption {
+      fill: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-anchor: middle;
+      text-transform: uppercase;
+    }
+
+    .pipe-flow {
+      fill: none;
+      stroke-width: 4.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 10 12;
+      marker-end: url(#pipe-arrow);
+      animation: flow linear infinite;
+    }
+
+    .edge-label-bg {
+      fill: rgba(252, 251, 247, 0.96);
+      stroke: rgba(45, 41, 38, 0.12);
+      stroke-width: 1;
+    }
+
+    .edge-label {
+      fill: var(--ink);
+      font-family: var(--font-hand);
+      font-size: 13.5px;
+      font-weight: 600;
+      text-anchor: middle;
+    }
+
+    @keyframes flow {
+      from {
+        stroke-dashoffset: 0;
+      }
+      to {
+        stroke-dashoffset: -44;
+      }
+    }
+  </style>
+  <rect class="canvas-bg" x="0" y="0" width="1480" height="860" />
+  <rect class="canvas-grain" x="0" y="0" width="1480" height="860" />
+  <g class="header">
+<text class="title" x="72" y="82">Insight Delivery Flow</text>
+<text class="subtitle" x="72" y="112">Signal intake -&gt; scoring -&gt; routing</text>
+</g>
+  <g class="group" id="group-discovery">
+<path class="group-frame" d="M 108 150 H 442 A 28 28 0 0 1 470 178 V 622 A 28 28 0 0 1 442 650 H 108 A 28 28 0 0 1 80 622 V 178 A 28 28 0 0 1 108 150 Z" />
+<text class="group-title" x="102" y="184">Discovery</text>
+</g>
+<g class="group" id="group-decisioning">
+<path class="group-frame" d="M 568 150 H 922 A 28 28 0 0 1 950 178 V 622 A 28 28 0 0 1 922 650 H 568 A 28 28 0 0 1 540 622 V 178 A 28 28 0 0 1 568 150 Z" />
+<text class="group-title" x="562" y="184">Decisioning</text>
+</g>
+<g class="group" id="group-delivery">
+<path class="group-frame" d="M 1048 150 H 1352 A 28 28 0 0 1 1380 178 V 622 A 28 28 0 0 1 1352 650 H 1048 A 28 28 0 0 1 1020 622 V 178 A 28 28 0 0 1 1048 150 Z" />
+<text class="group-title" x="1042" y="184">Delivery</text>
+</g>
+  <g class="edges">
+    <g class="edge edge-0">
+<path class="pipe-flow" style="stroke: var(--flow-mint); animation-duration: 2.4s;" d="M 370 278 C 467.2 278, 542.8 278, 640 278" />
+<rect class="edge-label-bg" x="438.8" y="228" width="132.4" height="32" rx="16" />
+<text class="edge-label" x="505" y="244">
+<tspan x="505" dy="0">clean stream</tspan>
+</text>
+</g>
+<g class="edge edge-1">
+<path class="pipe-flow" style="stroke: var(--flow-sky); animation-duration: 2.1s;" d="M 370 478 C 495.2 478, 514.8 278, 640 278" />
+<rect class="edge-label-bg" x="402.97" y="294.75" width="124.2" height="32" rx="16" />
+<text class="edge-label" x="465.07" y="310.75">
+<tspan x="465.07" dy="0">feature set</tspan>
+</text>
+</g>
+<g class="edge edge-2">
+<path class="pipe-flow" style="stroke: var(--flow-mint); animation-duration: 1.8s;" d="M 860 278 C 942.8 278, 1007.2 278, 1090 278" />
+<rect class="edge-label-bg" x="896.5" y="228" width="157" height="32" rx="16" />
+<text class="edge-label" x="975" y="244">
+<tspan x="975" dy="0">high confidence</tspan>
+</text>
+</g>
+<g class="edge edge-3">
+<path class="pipe-flow" style="stroke: var(--flow-amber); animation-duration: 2.7s;" d="M 750 326 C 750 380, 750 376, 750 430" />
+<rect class="edge-label-bg" x="649.8" y="362" width="132.4" height="32" rx="16" />
+<text class="edge-label" x="716" y="378">
+<tspan x="716" dy="0">needs review</tspan>
+</text>
+</g>
+<g class="edge edge-4">
+<path class="pipe-flow" style="stroke: var(--flow-coral); animation-duration: 2.3s;" d="M 860 478 C 970.8 478, 979.2 278, 1090 278" />
+<rect class="edge-label-bg" x="956.52" y="447.16" width="99.6" height="32" rx="16" />
+<text class="edge-label" x="1006.32" y="463.16">
+<tspan x="1006.32" dy="0">approved</tspan>
+</text>
+</g>
+<g class="edge edge-5">
+<path class="pipe-flow" style="stroke: var(--flow-sky); animation-duration: 2s;" d="M 1200 326 C 1200 380, 1200 376, 1200 430" />
+<rect class="edge-label-bg" x="1096.3" y="362" width="91.4" height="32" rx="16" />
+<text class="edge-label" x="1142" y="378">
+<tspan x="1142" dy="0">handoff</tspan>
+</text>
+</g>
+  </g>
+  <g class="nodes">
+    <g class="node" id="node-signals">
+<path class="node-fill" style="fill: var(--sand);" d="M 170.69 230.62 H 350.69 A 20 20 0 0 1 370.69 250.62 V 306.62 A 20 20 0 0 1 350.69 326.62 H 170.69 A 20 20 0 0 1 150.69 306.62 V 250.62 A 20 20 0 0 1 170.69 230.62 Z" />
+<path class="node-stroke" d="M 170.69 230.62 H 350.69 A 20 20 0 0 1 370.69 250.62 V 306.62 A 20 20 0 0 1 350.69 326.62 H 170.69 A 20 20 0 0 1 150.69 306.62 V 250.62 A 20 20 0 0 1 170.69 230.62 Z" />
+<path class="node-stroke ghost" d="M 170.71 230.63 H 350.71 A 20 20 0 0 1 370.71 250.63 V 306.63 A 20 20 0 0 1 350.71 326.63 H 170.71 A 20 20 0 0 1 150.71 306.63 V 250.63 A 20 20 0 0 1 170.71 230.63 Z" />
+<text class="node-label" x="260" y="260">
+<tspan x="260" dy="0">Collect</tspan>
+<tspan x="260" dy="1.15em">Signals</tspan>
+</text>
+<text class="node-caption" x="260" y="308">intake</text>
+</g>
+<g class="node" id="node-normalize">
+<path class="node-fill" style="fill: var(--graphite);" d="M 171.28 431.13 H 351.28 A 20 20 0 0 1 371.28 451.13 V 507.13 A 20 20 0 0 1 351.28 527.13 H 171.28 A 20 20 0 0 1 151.28 507.13 V 451.13 A 20 20 0 0 1 171.28 431.13 Z" />
+<path class="node-stroke" d="M 171.28 431.13 H 351.28 A 20 20 0 0 1 371.28 451.13 V 507.13 A 20 20 0 0 1 351.28 527.13 H 171.28 A 20 20 0 0 1 151.28 507.13 V 451.13 A 20 20 0 0 1 171.28 431.13 Z" />
+<path class="node-stroke ghost" d="M 171.3 431.15 H 351.3 A 20 20 0 0 1 371.3 451.15 V 507.15 A 20 20 0 0 1 351.3 527.15 H 171.3 A 20 20 0 0 1 151.3 507.15 V 451.15 A 20 20 0 0 1 171.3 431.15 Z" />
+<text class="node-label" x="260" y="460">
+<tspan x="260" dy="0">Normalize</tspan>
+<tspan x="260" dy="1.15em">Events</tspan>
+</text>
+<text class="node-caption" x="260" y="508">shape + merge</text>
+</g>
+<g class="node" id="node-score">
+<path class="node-fill" style="fill: var(--mint);" d="M 660.82 230.72 H 840.82 A 20 20 0 0 1 860.82 250.72 V 306.72 A 20 20 0 0 1 840.82 326.72 H 660.82 A 20 20 0 0 1 640.82 306.72 V 250.72 A 20 20 0 0 1 660.82 230.72 Z" />
+<path class="node-stroke" d="M 660.82 230.72 H 840.82 A 20 20 0 0 1 860.82 250.72 V 306.72 A 20 20 0 0 1 840.82 326.72 H 660.82 A 20 20 0 0 1 640.82 306.72 V 250.72 A 20 20 0 0 1 660.82 230.72 Z" />
+<path class="node-stroke ghost" d="M 660.83 230.74 H 840.83 A 20 20 0 0 1 860.83 250.74 V 306.74 A 20 20 0 0 1 840.83 326.74 H 660.83 A 20 20 0 0 1 640.83 306.74 V 250.74 A 20 20 0 0 1 660.83 230.74 Z" />
+<text class="node-label" x="750" y="260">
+<tspan x="750" dy="0">Score</tspan>
+<tspan x="750" dy="1.15em">Opportunity</tspan>
+</text>
+<text class="node-caption" x="750" y="308">model</text>
+</g>
+<g class="node" id="node-review">
+<path class="node-fill" style="fill: var(--amber);" d="M 749.15 429.27 L 859.15 477.27 L 749.15 525.27 L 639.15 477.27 Z" />
+<path class="node-stroke" d="M 749.15 429.27 L 859.15 477.27 L 749.15 525.27 L 639.15 477.27 Z" />
+<path class="node-stroke ghost" d="M 749.17 429.28 L 859.17 477.28 L 749.17 525.28 L 639.17 477.28 Z" />
+<text class="node-label" x="750" y="460">
+<tspan x="750" dy="0">Human</tspan>
+<tspan x="750" dy="1.15em">Review</tspan>
+</text>
+<text class="node-caption" x="750" y="508">branch</text>
+</g>
+<g class="node" id="node-route">
+<path class="node-fill" style="fill: var(--sky);" d="M 1110.89 230.79 H 1290.89 A 20 20 0 0 1 1310.89 250.79 V 306.79 A 20 20 0 0 1 1290.89 326.79 H 1110.89 A 20 20 0 0 1 1090.89 306.79 V 250.79 A 20 20 0 0 1 1110.89 230.79 Z" />
+<path class="node-stroke" d="M 1110.89 230.79 H 1290.89 A 20 20 0 0 1 1310.89 250.79 V 306.79 A 20 20 0 0 1 1290.89 326.79 H 1110.89 A 20 20 0 0 1 1090.89 306.79 V 250.79 A 20 20 0 0 1 1110.89 230.79 Z" />
+<path class="node-stroke ghost" d="M 1110.91 230.8 H 1290.91 A 20 20 0 0 1 1310.91 250.8 V 306.8 A 20 20 0 0 1 1290.91 326.8 H 1110.91 A 20 20 0 0 1 1090.91 306.8 V 250.8 A 20 20 0 0 1 1110.91 230.8 Z" />
+<text class="node-label" x="1200" y="260">
+<tspan x="1200" dy="0">Route</tspan>
+<tspan x="1200" dy="1.15em">Next Action</tspan>
+</text>
+<text class="node-caption" x="1200" y="308">decision</text>
+</g>
+<g class="node" id="node-notify">
+<path class="node-fill" style="fill: var(--coral);" d="M 1137.19 429.31 H 1261.19 A 48 48 0 0 1 1309.19 477.31 V 477.31 A 48 48 0 0 1 1261.19 525.31 H 1137.19 A 48 48 0 0 1 1089.19 477.31 V 477.31 A 48 48 0 0 1 1137.19 429.31 Z" />
+<path class="node-stroke" d="M 1137.19 429.31 H 1261.19 A 48 48 0 0 1 1309.19 477.31 V 477.31 A 48 48 0 0 1 1261.19 525.31 H 1137.19 A 48 48 0 0 1 1089.19 477.31 V 477.31 A 48 48 0 0 1 1137.19 429.31 Z" />
+<path class="node-stroke ghost" d="M 1137.21 429.32 H 1261.21 A 48 48 0 0 1 1309.21 477.32 V 477.32 A 48 48 0 0 1 1261.21 525.32 H 1137.21 A 48 48 0 0 1 1089.21 477.32 V 477.32 A 48 48 0 0 1 1137.21 429.32 Z" />
+<text class="node-label" x="1200" y="460">
+<tspan x="1200" dy="0">Notify</tspan>
+<tspan x="1200" dy="1.15em">Owner</tspan>
+</text>
+<text class="node-caption" x="1200" y="508">async</text>
+</g>
+  </g>
+</svg>

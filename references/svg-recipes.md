@@ -85,6 +85,10 @@ Use groups to frame stages or swimlanes:
 }
 ```
 
+**Node membership:** Nodes can declare their group with a `"group"` field (e.g. `"group": "lane-a"`). If omitted, the renderer infers membership by checking which group originally contains the node center.
+
+**Auto-refit:** After layout adjustments move nodes, group boundaries are automatically recalculated to tightly enclose their member nodes with padding. You do not need to manually size groups to account for layout shifts.
+
 ## Relationship Pattern
 
 Compose each relationship with one animated dashed stroke:

@@ -15,19 +15,23 @@ Set `SKILL_DIR` to the **absolute path of the directory containing this SKILL.md
 
 If you cannot determine the path this file was loaded from, search these locations and use the first that exists:
 
-- `${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram`
-- `$HOME/.claude/skills/svg-flow-diagram`
-- `$HOME/.opencode/skills/svg-flow-diagram`
+1. `$CODEX_HOME/skills/svg-flow-diagram` (if `CODEX_HOME` is set)
+2. `~/.codex/skills/svg-flow-diagram`
+3. `~/.claude/skills/svg-flow-diagram`
+4. `~/.opencode/skills/svg-flow-diagram`
 
-In shell:
+Use a simple test to find the directory. Run each line one at a time until one succeeds:
 
 ```bash
-SKILL_DIR=""
-for d in "${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram" \
-         "$HOME/.claude/skills/svg-flow-diagram" \
-         "$HOME/.opencode/skills/svg-flow-diagram"; do
-  [ -d "$d" ] && SKILL_DIR="$d" && break
-done
+test -d ~/.codex/skills/svg-flow-diagram && SKILL_DIR=~/.codex/skills/svg-flow-diagram
+```
+
+```bash
+test -d ~/.claude/skills/svg-flow-diagram && SKILL_DIR=~/.claude/skills/svg-flow-diagram
+```
+
+```bash
+test -d ~/.opencode/skills/svg-flow-diagram && SKILL_DIR=~/.opencode/skills/svg-flow-diagram
 ```
 
 ## Quick Start
@@ -140,6 +144,7 @@ Supported node fields:
 - `x`, `y`, `w`, `h`
 - `tone`: `sand`, `mint`, `sky`, `coral`, `amber`, `graphite`
 - `shape`: `rect`, `pill`, `diamond`
+- `group`: id of the parent group (optional; if omitted, inferred by containment)
 
 Supported edge fields:
 

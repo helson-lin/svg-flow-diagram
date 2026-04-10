@@ -808,6 +808,71 @@ def render_header(spec: dict, metrics: dict[str, float]) -> str:
     return "\n".join(parts)
 
 
+def assign_nodes_to_groups(
+    nodes_list: list[dict], groups: list[dict]
+) -> dict[str, list[str]]:
+    """Determine which nodes belong to which group.
+
+    Uses the ``group`` field on each node if present.  Otherwise falls back
+    to containment: a node belongs to the smallest group whose original
+    bounding box contains the node center.
+    """
+    membership: dict[str, list[str]] = {group["id"]: [] for group in groups}
+    for node in nodes_list:
+        explicit = node.get("group")
+        if explicit and explicit in membership:
+            membership[explicit].append(node["id"])
+            continue
+        # Containment fallback – pick the smallest enclosing group.
+        ncx = float(node["x"]) + float(node["w"]) / 2
+        ncy = float(node["y"]) + float(node["h"]) / 2
+        best_group: str | None = None
+        best_area = float("inf")
+        for group in groups:
+            gx = float(group["x"])
+            gy = float(group["y"])
+            gw = float(group["w"])
+            gh = float(group["h"])
+            if gx <= ncx <= gx + gw and gy <= ncy <= gy + gh:
+                area = gw * gh
+                if area < best_area:
+                    best_area = area
+                    best_group = group["id"]
+        if best_group is not None:
+            membership[best_group].append(node["id"])
+    return membership
+
+
+GROUP_NODE_PADDING = 36.0
+GROUP_TITLE_HEIGHT = 48.0
+
+
+def refit_groups(
+    groups: list[dict],
+    nodes_list: list[dict],
+    membership: dict[str, list[str]],
+    padding: float = GROUP_NODE_PADDING,
+    title_height: float = GROUP_TITLE_HEIGHT,
+) -> None:
+    """Resize each group to tightly enclose its member nodes plus padding."""
+    nodes_by_id = {node["id"]: node for node in nodes_list}
+    for group in groups:
+        member_ids = membership.get(group["id"], [])
+        if not member_ids:
+            continue
+        members = [nodes_by_id[nid] for nid in member_ids if nid in nodes_by_id]
+        if not members:
+            continue
+        min_x = min(float(n["x"]) for n in members)
+        min_y = min(float(n["y"]) for n in members)
+        max_x = max(float(n["x"]) + float(n["w"]) for n in members)
+        max_y = max(float(n["y"]) + float(n["h"]) for n in members)
+        group["x"] = min_x - padding
+        group["y"] = min_y - padding - title_height
+        group["w"] = (max_x - min_x) + padding * 2
+        group["h"] = (max_y - min_y) + padding * 2 + title_height
+
+
 def render_groups(groups: list[dict]) -> str:
     parts: list[str] = []
     for group in groups:
@@ -1176,6 +1241,9 @@ def render_svg(spec: dict) -> str:
                 node["y"] = float(node["y"]) + delta
             for group in groups:
                 group["y"] = float(group["y"]) + delta
+    # Determine group membership BEFORE layout adjustments move nodes.
+    group_membership = assign_nodes_to_groups(nodes_list, groups) if groups else {}
+
     normalize_node_spacing_2d(nodes_list)
     enforce_edge_label_corridors(nodes_list, edges)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
@@ -1191,6 +1259,11 @@ def render_svg(spec: dict) -> str:
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
     enforce_edge_label_corridors(nodes_list, edges)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
+
+    # Refit groups to contain their member nodes after all layout passes.
+    if groups and group_membership:
+        refit_groups(groups, nodes_list, group_membership)
+
     content_right = max(
         [float(node["x"]) + float(node["w"]) for node in nodes_list]
         + [float(group["x"]) + float(group["w"]) for group in groups]

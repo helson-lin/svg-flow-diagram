@@ -83,6 +83,8 @@ Use these defaults unless the user provides a stronger brand system:
 - Keep at least `24-40` px between nodes.
 - Keep group frames roomy enough to avoid crowding labels near borders.
 - Leave vertical space above the first row when adding a title.
+- Inside one group, snap nodes to shared center lines instead of nudging each box by hand.
+- Keep enough inner padding inside each group so rerouted edges can pass around nodes without clipping the frame.
 
 ## Avoid
 

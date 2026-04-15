@@ -5,11 +5,27 @@ Use this file when you need the JSON input format or reusable SVG implementation
 ## CLI
 
 ```bash
-# SKILL_DIR must be resolved before running — see SKILL.md for details.
+SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram"
+test -f "$SKILL_DIR/scripts/render_flow_svg.py"
+test -f "$SKILL_DIR/assets/example-spec.json"
 python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
   "$SKILL_DIR/assets/example-spec.json" \
   /absolute/path/to/output.svg
 ```
+
+For chat-friendly delivery, keep the SVG and also export a flattened SVG plus PNG in one pass:
+
+```bash
+python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
+  /absolute/path/to/spec.json \
+  /absolute/path/to/output.svg \
+  --flat-svg-out /absolute/path/to/output.flat.svg \
+  --png-out /absolute/path/to/output.png
+```
+
+If the skill was provided with an explicit filesystem path, use that path as `SKILL_DIR` instead of assuming the default install location.
+
+Write the output SVG to the task workspace or another explicit destination. Do not write generated output back into the skill's `assets/` directory.
 
 ## Minimal Spec
 
@@ -85,9 +101,7 @@ Use groups to frame stages or swimlanes:
 }
 ```
 
-**Node membership:** Nodes can declare their group with a `"group"` field (e.g. `"group": "lane-a"`). If omitted, the renderer infers membership by checking which group originally contains the node center.
-
-**Auto-refit:** After layout adjustments move nodes, group boundaries are automatically recalculated to tightly enclose their member nodes with padding. You do not need to manually size groups to account for layout shifts.
+When multiple nodes belong to the same group, keep their centers roughly aligned by row or column. The renderer now snaps near-aligned nodes inside a group and prefers edge routes with fewer crossings, so provide group boxes and approximate grid placement instead of tiny per-node offsets.
 
 ## Relationship Pattern
 

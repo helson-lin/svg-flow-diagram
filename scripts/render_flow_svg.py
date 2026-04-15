@@ -7,6 +7,8 @@ import argparse
 import html
 import json
 import math
+import shutil
+import subprocess
 import unicodedata
 from pathlib import Path
 
@@ -25,6 +27,23 @@ DEFAULT_THEME = {
     "flow_sky": "#2F7CF6",
     "flow_coral": "#F36B3C",
     "flow_amber": "#D79210",
+}
+
+FLAT_THEME = {
+    "bg-paper": "#FCFBF7",
+    "ink": "#2D2926",
+    "muted": "#7A6F66",
+    "grid": "#E8E1D7",
+    "sand": "#FFF0CF",
+    "mint": "#DFF7E8",
+    "sky": "#DCEBFF",
+    "coral": "#FFE0D7",
+    "amber": "#FFE8B5",
+    "graphite": "#EAE6E1",
+    "flow-mint": "#24B36B",
+    "flow-sky": "#2F7CF6",
+    "flow-coral": "#F36B3C",
+    "flow-amber": "#D79210",
 }
 
 TONE_TO_FILL = {
@@ -65,6 +84,14 @@ EDGE_LABEL_LINE_HEIGHT = 16.0
 EDGE_LABEL_MAX_LINES = 3
 EDGE_LABEL_PAD_X = 20.0
 EDGE_LABEL_PAD_Y = 10.0
+GROUP_INNER_PAD_X = 42.0
+GROUP_INNER_PAD_TOP = 62.0
+GROUP_INNER_PAD_BOTTOM = 34.0
+ALIGN_SNAP_THRESHOLD = 120.0
+EDGE_CROSSING_PENALTY = 7800.0
+EDGE_NODE_OVERLAP_PENALTY = 4200.0
+EDGE_BACKTRACK_PENALTY = 160.0
+EDGE_SIDE_DEVIATION_PENALTY = 52.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,6 +100,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("spec", help="Path to the JSON diagram spec.")
     parser.add_argument("output", help="Path to the output SVG file.")
+    parser.add_argument(
+        "--flat-svg-out",
+        help="Optional path to a flattened-color SVG for raster export compatibility.",
+    )
+    parser.add_argument(
+        "--png-out",
+        help="Optional path to a PNG preview. Requires rsvg-convert or magick.",
+    )
     return parser.parse_args()
 
 
@@ -396,6 +431,19 @@ def point_in_rect(
     )
 
 
+def point_in_group(point: tuple[float, float], group: dict, margin: float = 0.0) -> bool:
+    return point_in_rect(
+        point,
+        (
+            float(group["x"]),
+            float(group["y"]),
+            float(group["w"]),
+            float(group["h"]),
+        ),
+        margin,
+    )
+
+
 def off_canvas_penalty(
     rect: tuple[float, float, float, float],
     width: float,
@@ -642,6 +690,101 @@ def node_center(node: dict) -> tuple[float, float]:
     return (float(node["x"]) + float(node["w"]) / 2, float(node["y"]) + float(node["h"]) / 2)
 
 
+def node_group_map(
+    nodes_list: list[dict], groups: list[dict]
+) -> dict[str, dict]:
+    memberships: dict[str, dict] = {}
+    for node in nodes_list:
+        center = node_center(node)
+        for group in groups:
+            if point_in_group(center, group):
+                memberships[node["id"]] = group
+                break
+    return memberships
+
+
+def snap_axis_positions(
+    nodes: list[dict], axis: str, threshold: float = ALIGN_SNAP_THRESHOLD
+) -> None:
+    if len(nodes) < 2:
+        return
+    def axis_value(node: dict) -> float:
+        if axis == "x":
+            return float(node["x"]) + float(node["w"]) / 2
+        if axis == "y":
+            return float(node["y"]) + float(node["h"]) / 2
+        return float(node[axis])
+
+    ordered = sorted(nodes, key=axis_value)
+    clusters: list[list[dict]] = []
+    for node in ordered:
+        value = axis_value(node)
+        if not clusters:
+            clusters.append([node])
+            continue
+        cluster_values = [axis_value(item) for item in clusters[-1]]
+        anchor = sum(cluster_values) / len(cluster_values)
+        if abs(value - anchor) <= threshold:
+            clusters[-1].append(node)
+        else:
+            clusters.append([node])
+    for cluster in clusters:
+        if len(cluster) < 2:
+            continue
+        target = round(sum(axis_value(node) for node in cluster) / len(cluster))
+        for node in cluster:
+            if axis == "x":
+                node["x"] = target - (float(node["w"]) / 2)
+            elif axis == "y":
+                node["y"] = target - (float(node["h"]) / 2)
+            else:
+                node[axis] = target
+
+
+def clamp_nodes_to_groups(
+    nodes_list: list[dict], groups: list[dict], memberships: dict[str, dict]
+) -> None:
+    if not groups or not memberships:
+        return
+    for node in nodes_list:
+        group = memberships.get(node["id"])
+        if not group:
+            continue
+        gx = float(group["x"])
+        gy = float(group["y"])
+        gw = float(group["w"])
+        gh = float(group["h"])
+        w = float(node["w"])
+        h = float(node["h"])
+        min_x = gx + GROUP_INNER_PAD_X
+        max_x = gx + gw - GROUP_INNER_PAD_X - w
+        min_y = gy + GROUP_INNER_PAD_TOP
+        max_y = gy + gh - GROUP_INNER_PAD_BOTTOM - h
+        node["x"] = min(max(float(node["x"]), min_x), max_x if max_x >= min_x else min_x)
+        node["y"] = min(max(float(node["y"]), min_y), max_y if max_y >= min_y else min_y)
+
+
+def align_nodes_within_groups(nodes_list: list[dict], groups: list[dict]) -> dict[str, dict]:
+    memberships = node_group_map(nodes_list, groups)
+    if not groups or not memberships:
+        return memberships
+    grouped: dict[str, list[dict]] = {}
+    for node in nodes_list:
+        group = memberships.get(node["id"])
+        if not group:
+            continue
+        grouped.setdefault(group["id"], []).append(node)
+
+    for group in groups:
+        members = grouped.get(group["id"], [])
+        if len(members) < 2:
+            continue
+        snap_axis_positions(members, "x")
+        snap_axis_positions(members, "y")
+    clamp_nodes_to_groups(nodes_list, groups, memberships)
+    return memberships
+
+
 def edge_node_push_vectors(
     edge: dict,
     geometry: dict[str, object],
@@ -739,11 +882,48 @@ def sample_cubic_points(
     ]
 
 
-def edge_geometry(edge: dict, nodes: dict[str, dict]) -> dict[str, object]:
+def ccw(a: tuple[float, float], b: tuple[float, float], c: tuple[float, float]) -> bool:
+    return ((c[1] - a[1]) * (b[0] - a[0])) > ((b[1] - a[1]) * (c[0] - a[0]))
+
+
+def segments_intersect(
+    a1: tuple[float, float],
+    a2: tuple[float, float],
+    b1: tuple[float, float],
+    b2: tuple[float, float],
+) -> bool:
+    if a1 == b1 or a1 == b2 or a2 == b1 or a2 == b2:
+        return False
+    return ccw(a1, b1, b2) != ccw(a2, b1, b2) and ccw(a1, a2, b1) != ccw(a1, a2, b2)
+
+
+def candidate_sides(source: dict, target: dict, default: str, is_source: bool) -> list[str]:
+    sx, sy = node_center(source)
+    tx, ty = node_center(target)
+    dx = tx - sx
+    dy = ty - sy
+    candidates = [default]
+    if abs(dx) >= abs(dy):
+        candidates.append("bottom" if dy >= 0 else "top")
+        candidates.append("top" if dy >= 0 else "bottom")
+        candidates.append("left" if is_source else "right") if dx >= 0 else candidates.append("right" if is_source else "left")
+    else:
+        candidates.append("right" if dx >= 0 else "left")
+        candidates.append("left" if dx >= 0 else "right")
+        candidates.append("top" if is_source else "bottom") if dy >= 0 else candidates.append("bottom" if is_source else "top")
+    candidates.extend(["right", "left", "bottom", "top"])
+    out: list[str] = []
+    for side in candidates:
+        if side not in out:
+            out.append(side)
+    return out
+
+
+def edge_geometry_for_sides(
+    edge: dict, nodes: dict[str, dict], from_side: str, to_side: str
+) -> dict[str, object]:
     source = nodes[edge["from"]]
     target = nodes[edge["to"]]
-    from_side = edge.get("fromSide") or infer_side(source, target)
-    to_side = edge.get("toSide") or infer_side(target, source)
     start = anchor_point(source, from_side)
     end = anchor_point(target, to_side)
     dx = abs(end[0] - start[0])
@@ -771,10 +951,164 @@ def edge_geometry(edge: dict, nodes: dict[str, dict]) -> dict[str, object]:
         "cp1": cp1,
         "cp2": cp2,
         "end": end,
+        "from_side": from_side,
+        "to_side": to_side,
         "stroke_width": stroke_width,
         "dash_a": dash_a,
         "dash_b": dash_b,
     }
+
+
+def edge_crossing_score(
+    candidate: dict[str, object], prior_geometries: list[dict[str, object]]
+) -> float:
+    candidate_samples = sample_cubic_points(
+        candidate["start"], candidate["cp1"], candidate["cp2"], candidate["end"], count=17
+    )
+    score = 0.0
+    for geometry in prior_geometries:
+        existing_samples = sample_cubic_points(
+            geometry["start"], geometry["cp1"], geometry["cp2"], geometry["end"], count=17
+        )
+        for i in range(len(candidate_samples) - 1):
+            for j in range(len(existing_samples) - 1):
+                if segments_intersect(
+                    candidate_samples[i],
+                    candidate_samples[i + 1],
+                    existing_samples[j],
+                    existing_samples[j + 1],
+                ):
+                    score += EDGE_CROSSING_PENALTY
+                    break
+            else:
+                continue
+            break
+    return score
+
+
+def edge_node_overlap_score(
+    edge: dict, geometry: dict[str, object], nodes: dict[str, dict]
+) -> float:
+    source_id = edge["from"]
+    target_id = edge["to"]
+    samples = sample_cubic_points(
+        geometry["start"], geometry["cp1"], geometry["cp2"], geometry["end"], count=25
+    )
+    score = 0.0
+    for node_id, node in nodes.items():
+        if node_id in {source_id, target_id}:
+            continue
+        rect = node_bounds(node)
+        hits = sum(1 for point in samples[2:-2] if point_in_rect(point, rect, EDGE_NODE_MARGIN))
+        if hits:
+            score += EDGE_NODE_OVERLAP_PENALTY * hits
+    return score
+
+
+def choose_edge_geometry(
+    edge: dict,
+    nodes: dict[str, dict],
+    prior_geometries: list[dict[str, object]],
+) -> dict[str, object]:
+    source = nodes[edge["from"]]
+    target = nodes[edge["to"]]
+    default_from = edge.get("fromSide") or infer_side(source, target)
+    default_to = edge.get("toSide") or infer_side(target, source)
+    if edge.get("fromSide") and edge.get("toSide"):
+        return edge_geometry_for_sides(edge, nodes, default_from, default_to)
+
+    candidates: list[tuple[float, dict[str, object]]] = []
+    for from_side in candidate_sides(source, target, default_from, is_source=True):
+        source_candidates = [from_side] if edge.get("fromSide") else [from_side]
+        for actual_from in source_candidates:
+            for to_side in candidate_sides(target, source, default_to, is_source=False):
+                actual_to = edge.get("toSide") or to_side
+                geometry = edge_geometry_for_sides(edge, nodes, actual_from, actual_to)
+                score = 0.0
+                if actual_from != default_from:
+                    score += EDGE_SIDE_DEVIATION_PENALTY
+                if actual_to != default_to:
+                    score += EDGE_SIDE_DEVIATION_PENALTY
+                score += edge_node_overlap_score(edge, geometry, nodes)
+                score += edge_crossing_score(geometry, prior_geometries)
+                if geometry["end"][0] < geometry["start"][0] and actual_from in {"right", "left"}:
+                    score += EDGE_BACKTRACK_PENALTY
+                candidates.append((score, geometry))
+    if not candidates:
+        return edge_geometry_for_sides(edge, nodes, default_from, default_to)
+    return min(candidates, key=lambda item: item[0])[1]
+
+
+def edge_total_score(
+    edge: dict,
+    geometry: dict[str, object],
+    nodes: dict[str, dict],
+    other_geometries: list[dict[str, object]],
+) -> float:
+    source = nodes[edge["from"]]
+    target = nodes[edge["to"]]
+    default_from = edge.get("fromSide") or infer_side(source, target)
+    default_to = edge.get("toSide") or infer_side(target, source)
+    score = 0.0
+    if geometry["from_side"] != default_from:
+        score += EDGE_SIDE_DEVIATION_PENALTY
+    if geometry["to_side"] != default_to:
+        score += EDGE_SIDE_DEVIATION_PENALTY
+    score += edge_node_overlap_score(edge, geometry, nodes)
+    score += edge_crossing_score(geometry, other_geometries)
+    if geometry["end"][0] < geometry["start"][0] and geometry["from_side"] in {"right", "left"}:
+        score += EDGE_BACKTRACK_PENALTY
+    return score
+
+
+def improve_crossing_edges(
+    edges: list[dict], nodes: dict[str, dict], geometries: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    for _ in range(3):
+        changed = False
+        for index, edge in enumerate(edges):
+            current = geometries[index]
+            others = [geometry for i, geometry in enumerate(geometries) if i != index]
+            current_score = edge_total_score(edge, current, nodes, others)
+            source = nodes[edge["from"]]
+            target = nodes[edge["to"]]
+            default_from = edge.get("fromSide") or infer_side(source, target)
+            default_to = edge.get("toSide") or infer_side(target, source)
+            best_score = current_score
+            best_geometry = current
+            for from_side in candidate_sides(source, target, default_from, is_source=True):
+                actual_from = edge.get("fromSide") or from_side
+                for to_side in candidate_sides(target, source, default_to, is_source=False):
+                    actual_to = edge.get("toSide") or to_side
+                    geometry = edge_geometry_for_sides(edge, nodes, actual_from, actual_to)
+                    score = edge_total_score(edge, geometry, nodes, others)
+                    if score + 1e-6 < best_score:
+                        best_score = score
+                        best_geometry = geometry
+            if best_geometry is not current:
+                geometries[index] = best_geometry
+                changed = True
+        if not changed:
+            break
+    return geometries
+
+
+def layout_edge_geometries(
+    edges: list[dict], nodes: dict[str, dict]
+) -> list[dict[str, object]]:
+    geometries: list[dict[str, object]] = []
+    for edge in edges:
+        geometry = choose_edge_geometry(edge, nodes, geometries)
+        geometries.append(geometry)
+    return improve_crossing_edges(edges, nodes, geometries)
+
+
+def edge_geometry(edge: dict, nodes: dict[str, dict]) -> dict[str, object]:
+    source = nodes[edge["from"]]
+    target = nodes[edge["to"]]
+    from_side = edge.get("fromSide") or infer_side(source, target)
+    to_side = edge.get("toSide") or infer_side(target, source)
+    return edge_geometry_for_sides(edge, nodes, from_side, to_side)
 
 
 def header_metrics(spec: dict) -> dict[str, float]:
@@ -806,71 +1140,6 @@ def render_header(spec: dict, metrics: dict[str, float]) -> str:
         )
     parts.append("</g>")
     return "\n".join(parts)
-
-
-def assign_nodes_to_groups(
-    nodes_list: list[dict], groups: list[dict]
-) -> dict[str, list[str]]:
-    """Determine which nodes belong to which group.
-
-    Uses the ``group`` field on each node if present.  Otherwise falls back
-    to containment: a node belongs to the smallest group whose original
-    bounding box contains the node center.
-    """
-    membership: dict[str, list[str]] = {group["id"]: [] for group in groups}
-    for node in nodes_list:
-        explicit = node.get("group")
-        if explicit and explicit in membership:
-            membership[explicit].append(node["id"])
-            continue
-        # Containment fallback – pick the smallest enclosing group.
-        ncx = float(node["x"]) + float(node["w"]) / 2
-        ncy = float(node["y"]) + float(node["h"]) / 2
-        best_group: str | None = None
-        best_area = float("inf")
-        for group in groups:
-            gx = float(group["x"])
-            gy = float(group["y"])
-            gw = float(group["w"])
-            gh = float(group["h"])
-            if gx <= ncx <= gx + gw and gy <= ncy <= gy + gh:
-                area = gw * gh
-                if area < best_area:
-                    best_area = area
-                    best_group = group["id"]
-        if best_group is not None:
-            membership[best_group].append(node["id"])
-    return membership
-
-
-GROUP_NODE_PADDING = 36.0
-GROUP_TITLE_HEIGHT = 48.0
-
-
-def refit_groups(
-    groups: list[dict],
-    nodes_list: list[dict],
-    membership: dict[str, list[str]],
-    padding: float = GROUP_NODE_PADDING,
-    title_height: float = GROUP_TITLE_HEIGHT,
-) -> None:
-    """Resize each group to tightly enclose its member nodes plus padding."""
-    nodes_by_id = {node["id"]: node for node in nodes_list}
-    for group in groups:
-        member_ids = membership.get(group["id"], [])
-        if not member_ids:
-            continue
-        members = [nodes_by_id[nid] for nid in member_ids if nid in nodes_by_id]
-        if not members:
-            continue
-        min_x = min(float(n["x"]) for n in members)
-        min_y = min(float(n["y"]) for n in members)
-        max_x = max(float(n["x"]) + float(n["w"]) for n in members)
-        max_y = max(float(n["y"]) + float(n["h"]) for n in members)
-        group["x"] = min_x - padding
-        group["y"] = min_y - padding - title_height
-        group["w"] = (max_x - min_x) + padding * 2
-        group["h"] = (max_y - min_y) + padding * 2 + title_height
 
 
 def render_groups(groups: list[dict]) -> str:
@@ -1241,11 +1510,10 @@ def render_svg(spec: dict) -> str:
                 node["y"] = float(node["y"]) + delta
             for group in groups:
                 group["y"] = float(group["y"]) + delta
-    # Determine group membership BEFORE layout adjustments move nodes.
-    group_membership = assign_nodes_to_groups(nodes_list, groups) if groups else {}
-
+    memberships = align_nodes_within_groups(nodes_list, groups)
     normalize_node_spacing_2d(nodes_list)
     enforce_edge_label_corridors(nodes_list, edges)
+    clamp_nodes_to_groups(nodes_list, groups, memberships)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
     avoid_edge_node_overlaps(
         nodes_list,
@@ -1253,17 +1521,19 @@ def render_svg(spec: dict) -> str:
         float(width),
         min_top=min_top,
     )
+    memberships = align_nodes_within_groups(nodes_list, groups)
     normalize_node_spacing_2d(nodes_list)
     normalize_node_vertical_spacing(nodes_list)
     enforce_edge_label_corridors(nodes_list, edges)
+    clamp_nodes_to_groups(nodes_list, groups, memberships)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
+    memberships = align_nodes_within_groups(nodes_list, groups)
     enforce_edge_label_corridors(nodes_list, edges)
+    clamp_nodes_to_groups(nodes_list, groups, memberships)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
-
-    # Refit groups to contain their member nodes after all layout passes.
-    if groups and group_membership:
-        refit_groups(groups, nodes_list, group_membership)
-
+    memberships = align_nodes_within_groups(nodes_list, groups)
+    clamp_nodes_to_groups(nodes_list, groups, memberships)
+    clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
     content_right = max(
         [float(node["x"]) + float(node["w"]) for node in nodes_list]
         + [float(group["x"]) + float(group["w"]) for group in groups]
@@ -1282,7 +1552,7 @@ def render_svg(spec: dict) -> str:
     )
 
     node_markup = "\n".join(render_node(node) for node in nodes_list)
-    edge_geometries = [edge_geometry(edge, nodes) for edge in edges]
+    edge_geometries = layout_edge_geometries(edges, nodes)
     edge_label_layouts = layout_edge_labels(edges, edge_geometries, nodes, width, height)
     edge_markup = "\n".join(
         render_edge(edge, index, edge_geometries[index], edge_label_layouts[index])
@@ -1429,13 +1699,49 @@ def render_svg(spec: dict) -> str:
 """
 
 
+def flatten_svg_colors(svg_text: str) -> str:
+    out = svg_text
+    for key, value in FLAT_THEME.items():
+        out = out.replace(f"var(--{key})", value)
+    out = out.replace('stroke="context-stroke"', f'stroke="{FLAT_THEME["ink"]}"')
+    return out
+
+
+def export_png(flat_svg_path: Path, png_path: Path) -> str:
+    rsvg = shutil.which("rsvg-convert")
+    if rsvg:
+        subprocess.run([rsvg, str(flat_svg_path), "-o", str(png_path)], check=True)
+        return "rsvg-convert"
+    magick = shutil.which("magick")
+    if magick:
+        subprocess.run([magick, str(flat_svg_path), str(png_path)], check=True)
+        return "magick"
+    raise RuntimeError(
+        "PNG export requires `rsvg-convert` or `magick`, but neither was found in PATH."
+    )
+
+
 def main() -> None:
     args = parse_args()
     spec_path = Path(args.spec)
     output_path = Path(args.output)
     spec = json.loads(spec_path.read_text())
-    output_path.write_text(render_svg(spec))
+    svg_text = render_svg(spec)
+    output_path.write_text(svg_text)
     print(f"Wrote {output_path}")
+    flat_svg_path: Path | None = None
+    if args.flat_svg_out:
+        flat_svg_path = Path(args.flat_svg_out)
+        flat_svg_path.write_text(flatten_svg_colors(svg_text))
+        print(f"Wrote {flat_svg_path}")
+    if args.png_out:
+        png_path = Path(args.png_out)
+        if flat_svg_path is None:
+            flat_svg_path = png_path.with_suffix(".flat.svg")
+            flat_svg_path.write_text(flatten_svg_colors(svg_text))
+            print(f"Wrote {flat_svg_path}")
+        tool = export_png(flat_svg_path, png_path)
+        print(f"Wrote {png_path} via {tool}")
 
 
 if __name__ == "__main__":

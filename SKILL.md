@@ -1,47 +1,27 @@
 ---
 name: svg-flow-diagram
-description: Create or revise standalone SVG flowcharts, process maps, architecture diagrams, and pipeline diagrams with dashed animated flow lines and an Excalidraw-like hand-drawn visual language. Use when the agent needs raw `.svg` output rather than Mermaid, HTML, or Figma, especially for requests mentioning SVG flowcharts, node-link diagrams, flowing connectors, animated pipelines, or Extradraw/Excalidraw-style visuals.
+description: Create or revise standalone SVG flowcharts, process maps, architecture diagrams, and pipeline diagrams with dashed animated flow lines and an Excalidraw-like hand-drawn visual language. Use when Codex needs raw `.svg` output rather than Mermaid, HTML, or Figma, especially for requests mentioning SVG flowcharts, node-link diagrams, flowing connectors, animated pipelines, or Extradraw/Excalidraw-style visuals.
 ---
 
 # SVG Flow Diagram
 
 Create standalone SVG diagrams with dashed animated flow connectors and a sketchy visual system inspired by Excalidraw.
 
-## SKILL_DIR — resolve this FIRST
-
-**IMPORTANT:** All file paths in this skill are relative to the directory containing this `SKILL.md` file. Do NOT resolve them from your current working directory.
-
-Set `SKILL_DIR` to the **absolute path of the directory containing this SKILL.md file** before reading any other file in this skill. For example, if this file was loaded from `/home/user/.codex/skills/svg-flow-diagram/SKILL.md`, then `SKILL_DIR=/home/user/.codex/skills/svg-flow-diagram`.
-
-If you cannot determine the path this file was loaded from, search these locations and use the first that exists:
-
-1. `$CODEX_HOME/skills/svg-flow-diagram` (if `CODEX_HOME` is set)
-2. `~/.codex/skills/svg-flow-diagram`
-3. `~/.claude/skills/svg-flow-diagram`
-4. `~/.opencode/skills/svg-flow-diagram`
-
-Use a simple test to find the directory. Run each line one at a time until one succeeds:
-
-```bash
-test -d ~/.codex/skills/svg-flow-diagram && SKILL_DIR=~/.codex/skills/svg-flow-diagram
-```
-
-```bash
-test -d ~/.claude/skills/svg-flow-diagram && SKILL_DIR=~/.claude/skills/svg-flow-diagram
-```
-
-```bash
-test -d ~/.opencode/skills/svg-flow-diagram && SKILL_DIR=~/.opencode/skills/svg-flow-diagram
-```
-
 ## Quick Start
 
 1. Translate the request into a diagram spec: canvas size, groups, nodes, edges, and notes.
-2. Use the bundled renderer at `$SKILL_DIR/scripts/render_flow_svg.py` when building a fresh diagram or iterating on layout several times.
-3. Patch the SVG directly only for small label, spacing, or color edits.
-4. Open references only when needed:
-- `$SKILL_DIR/references/style-guide.md` for palette, typography, node, and motion rules
-- `$SKILL_DIR/references/svg-recipes.md` for the JSON spec format and reusable SVG patterns
+2. Use the bundled renderer at the skill path when building a fresh diagram or iterating on layout several times.
+3. If the user needs an image in chat, keep the SVG and also generate a PNG preview from a flattened-color SVG.
+4. Patch the SVG directly only for small label, spacing, or color edits.
+5. Open references only when needed:
+- `references/style-guide.md` for palette, typography, node, and motion rules
+- `references/svg-recipes.md` for the JSON spec format and reusable SVG patterns
+
+Treat all paths in this skill as relative to the skill directory, not the caller's current working directory. If the skill was invoked with an explicit path, use that path as `SKILL_DIR`. Otherwise, resolve it from `${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram`.
+
+Before using bundled files, verify they exist. In shared environments such as opencode, the `SKILL.md` text may be available while `scripts/`, `references/`, or `assets/` are missing. If a bundled file is absent, do not claim it exists and do not keep retrying the same missing path.
+
+Write generated SVG files to the user's workspace or to an explicit output path, not back into the skill's `assets/` directory.
 
 ## Workflow
 
@@ -50,11 +30,26 @@ test -d ~/.opencode/skills/svg-flow-diagram && SKILL_DIR=~/.opencode/skills/svg-
 List these before drawing:
 
 - Primary flow direction: left-to-right, top-to-bottom, or loop
+- One dominant story: execution flow, system inventory, or responsibility map
 - Node types: step, decision, data, external system, annotation
 - Relationship types: main pipeline, optional branch, feedback loop, async signal
 - Emphasis: which edge or node needs accent color or faster motion
 
-Default to 4-8 nodes, one primary path, and at most two secondary branches when the request is vague.
+Default to 4-8 nodes, one primary path, and at most two secondary branches when the request is vague. If the request mixes system inventory and execution flow, split it into two diagrams instead of forcing both into one canvas.
+
+Before drawing, reduce the request into this planning stub:
+
+```text
+primary_path: node-a -> node-b -> node-c -> node-d
+secondary_branches:
+- node-b -> helper-x
+feedback_loops:
+- tool-y -> node-b
+layout_model: columns-by-phase | rows-by-swimlane
+lanes_or_phases: input, agent, execution, external, output
+```
+
+Do not skip this reduction step for diagrams with more than 4 nodes.
 
 ### 2. Choose the implementation path
 
@@ -82,6 +77,15 @@ Edit raw SVG when:
 - Keep edge-note capsules offset from the connector with visible breathing room.
 - Place edge notes on the cleaner side of the curve so the note pill and any connector never cross.
 - Keep icons minimal or omit them entirely.
+
+Enforce flow clarity before decoration:
+
+- Highlight one primary path with the straightest route, strongest contrast, and fewest turns.
+- Demote support and lookup paths with lighter color, thinner visual emphasis, or both.
+- Route feedback loops on the outer perimeter, not through the middle of the main spine.
+- Keep external systems at the far edge of the canvas so they read as destinations or dependencies, not core steps.
+- Write edge labels as verb phrases such as `load context`, `run command`, or `return result`. Avoid topic labels such as `context`, `command`, or `result`.
+- Use only one structural model per diagram: columns by phase or rows by swimlane. Do not mix both as primary organization cues.
 
 When the user says `extradraw`, treat it as `Excalidraw-like` unless they provide a more specific visual reference.
 
@@ -116,13 +120,46 @@ Before handing off:
 - Keep text at 14 px or above.
 - Keep the SVG standalone with no external JavaScript.
 - Prefer CSS variables and grouped classes over repeated inline styles.
+- When the user asks to send or preview the diagram, keep the original SVG and also export a PNG.
+- In the final response, include both file locations and use the PNG for the inline preview.
+
+Run this clarity checklist before handing off:
+
+- Can a reader trace the main path in under 5 seconds without reading every note? If not, simplify.
+- Does every non-primary edge justify itself? If not, delete it.
+- Does any feedback loop cut through the center of the chart? If yes, reroute it to the perimeter.
+- Does the diagram try to explain both architecture and chronological flow? If yes, split the output.
+- Do color and stroke weight encode a stable meaning across all edges? If not, normalize them before export.
 
 ## Script
 
 Render from a JSON spec with:
 
 ```bash
-# Resolve SKILL_DIR (see "Resolving SKILL_DIR" above), then:
+SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/svg-flow-diagram"
+test -f "$SKILL_DIR/scripts/render_flow_svg.py"
+test -f "$SKILL_DIR/assets/example-spec.json"
+python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
+  "$SKILL_DIR/assets/example-spec.json" \
+  /absolute/path/to/output.svg
+```
+
+When you need a deliverable image for chat, render all three artifacts in one command:
+
+```bash
+python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
+  /absolute/path/to/spec.json \
+  /absolute/path/to/output.svg \
+  --flat-svg-out /absolute/path/to/output.flat.svg \
+  --png-out /absolute/path/to/output.png
+```
+
+Keep the original SVG, use the PNG for preview/sending, and tell the user where both files were written.
+
+When the user supplies an explicit skill path, prefer that exact location:
+
+```bash
+SKILL_DIR="/absolute/path/to/svg-flow-diagram"
 python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
   "$SKILL_DIR/assets/example-spec.json" \
   /absolute/path/to/output.svg
@@ -130,43 +167,56 @@ python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
 
 Use the example spec at `"$SKILL_DIR/assets/example-spec.json"` as the starter format.
 
+If the renderer script is missing, skip the script flow and generate the SVG directly in the task workspace by following this skill's house style and the JSON shape documented in `references/svg-recipes.md`. If `base-template.svg` exists, copy and adapt it. If it does not exist, write a standalone SVG from scratch.
+
 Supported top-level fields:
 
 - `width`, `height`, `title`, `subtitle`
+- `direction`: prefer `lr` unless the request strongly needs top-to-bottom
+- `layoutModel`: `columns` or `swimlanes`
 - `theme`
 - `groups`
 - `nodes`
 - `edges`
 
+Use `direction`, `layoutModel`, and node/edge role metadata as planning fields even when the current renderer ignores them. They document intent and make manual revisions safer.
+
 Supported node fields:
 
 - `id`, `label`, `caption`
 - `x`, `y`, `w`, `h`
+- `lane` or `phase`: optional structural placement hints
+- `column`: optional ordering hint for left-to-right diagrams
+- `role`: `entry`, `core`, `support`, `decision`, `external`, `exit`
 - `tone`: `sand`, `mint`, `sky`, `coral`, `amber`, `graphite`
 - `shape`: `rect`, `pill`, `diamond`
-- `group`: id of the parent group (optional; if omitted, inferred by containment)
+
+Always decide node `role` before choosing tone or shape. Let the role drive emphasis, not the other way around.
 
 Supported edge fields:
 
 - `from`, `to`
 - `label`
+- `kind`: `primary`, `secondary`, `feedback`, `async`
 - `tone`
 - `fromSide`, `toSide`
 - `duration`
+
+Treat `kind` as mandatory during planning even if the current renderer only consumes `tone`. Keep one dominant `primary` chain, no more than two `secondary` branches, and at most one `feedback` loop unless the user explicitly asks for a denser systems map.
 
 ## References
 
 Open only what matters for the current task:
 
-- `$SKILL_DIR/references/style-guide.md`
-- `$SKILL_DIR/references/svg-recipes.md`
+- `references/style-guide.md`
+- `references/svg-recipes.md`
 
 ## Assets
 
 Reuse bundled assets as starting points:
 
-- `$SKILL_DIR/assets/example-spec.json` for script input
-- `$SKILL_DIR/assets/base-template.svg` for quick copy-edit workflows
+- `"$SKILL_DIR/assets/example-spec.json"` for script input
+- `"$SKILL_DIR/assets/base-template.svg"` for quick copy-edit workflows
 
 ## Guardrails
 

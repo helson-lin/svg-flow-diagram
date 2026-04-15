@@ -1,0 +1,349 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1780" height="980" viewBox="0 0 1780 980" role="img" aria-labelledby="diagram-title diagram-subtitle">
+  <title id="diagram-title">Hermes Agent 架构图</title>
+  <desc id="diagram-subtitle">请求入口 -&gt; 编排推理 -&gt; 安全约束 -&gt; 工具执行 -&gt; 结果回传</desc>
+  <defs>
+    <pattern id="paper-dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="var(--grid)" opacity="0.45" />
+      <circle cx="16" cy="12" r="0.8" fill="var(--grid)" opacity="0.28" />
+      <circle cx="10" cy="22" r="0.9" fill="var(--grid)" opacity="0.22" />
+    </pattern>
+    <marker id="pipe-arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 2 2 L 10 6 L 2 10" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+  </defs>
+  <style>
+    :root {
+      --bg-paper: #FCFBF7;
+      --ink: #2D2926;
+      --muted: #7A6F66;
+      --grid: #E8E1D7;
+      --sand: #FFF0CF;
+      --mint: #DFF7E8;
+      --sky: #DCEBFF;
+      --coral: #FFE0D7;
+      --amber: #FFE8B5;
+      --graphite: #EAE6E1;
+      --flow-mint: #24B36B;
+      --flow-sky: #2F7CF6;
+      --flow-coral: #F36B3C;
+      --flow-amber: #D79210;
+      --font-hand: Virgil, "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+      --font-sans: "Avenir Next", "Segoe UI", sans-serif;
+    }
+
+    .canvas-bg {
+      fill: var(--bg-paper);
+    }
+
+    .canvas-grain {
+      fill: url(#paper-dots);
+    }
+
+    .title {
+      fill: var(--ink);
+      font-family: var(--font-hand);
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      fill: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .group-frame {
+      fill: none;
+      stroke: var(--grid);
+      stroke-width: 2;
+      stroke-dasharray: 10 12;
+    }
+
+    .group-title {
+      fill: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .node-fill {
+      stroke: none;
+    }
+
+    .node-stroke {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .node-stroke.ghost {
+      opacity: 0.38;
+    }
+
+    .node-label {
+      fill: var(--ink);
+      font-family: var(--font-hand);
+      font-size: 18px;
+      font-weight: 600;
+      text-anchor: middle;
+    }
+
+    .node-caption {
+      fill: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-anchor: middle;
+      text-transform: uppercase;
+    }
+
+    .pipe-flow {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      marker-end: url(#pipe-arrow);
+      animation: flow linear infinite;
+    }
+
+    .edge-label-bg {
+      fill: rgba(252, 251, 247, 0.96);
+      stroke: rgba(45, 41, 38, 0.12);
+      stroke-width: 1;
+    }
+
+    .edge-label {
+      fill: var(--ink);
+      font-family: var(--font-hand);
+      font-size: 13.5px;
+      font-weight: 600;
+      text-anchor: middle;
+    }
+
+    @keyframes flow {
+      from {
+        stroke-dashoffset: 0;
+      }
+      to {
+        stroke-dashoffset: -44;
+      }
+    }
+  </style>
+  <rect class="canvas-bg" x="0" y="0" width="1780" height="980" />
+  <rect class="canvas-grain" x="0" y="0" width="1780" height="980" />
+  <g class="header">
+<text class="title" x="72" y="82">Hermes Agent 架构图</text>
+<text class="subtitle" x="72" y="112">请求入口 -&gt; 编排推理 -&gt; 安全约束 -&gt; 工具执行 -&gt; 结果回传</text>
+</g>
+  <g class="group" id="group-entry">
+<path class="group-frame" d="M 98 146 H 342 A 28 28 0 0 1 370 174 V 878 A 28 28 0 0 1 342 906 H 98 A 28 28 0 0 1 70 878 V 174 A 28 28 0 0 1 98 146 Z" />
+<text class="group-title" x="92" y="180">入口与回传</text>
+</g>
+<g class="group" id="group-orchestration">
+<path class="group-frame" d="M 458 146 H 812 A 28 28 0 0 1 840 174 V 878 A 28 28 0 0 1 812 906 H 458 A 28 28 0 0 1 430 878 V 174 A 28 28 0 0 1 458 146 Z" />
+<text class="group-title" x="452" y="180">编排与知识层</text>
+</g>
+<g class="group" id="group-execution">
+<path class="group-frame" d="M 928 146 H 1372 A 28 28 0 0 1 1400 174 V 878 A 28 28 0 0 1 1372 906 H 928 A 28 28 0 0 1 900 878 V 174 A 28 28 0 0 1 928 146 Z" />
+<text class="group-title" x="922" y="180">执行层</text>
+</g>
+<g class="group" id="group-ecosystem">
+<path class="group-frame" d="M 1488 146 H 1682 A 28 28 0 0 1 1710 174 V 878 A 28 28 0 0 1 1682 906 H 1488 A 28 28 0 0 1 1460 878 V 174 A 28 28 0 0 1 1488 146 Z" />
+<text class="group-title" x="1482" y="180">外部生态</text>
+</g>
+  <g class="edges">
+    <g class="edge edge-0">
+<path class="pipe-flow" style="stroke: var(--flow-mint); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 2s;" d="M 332 338 C 405.72 338, 441.28 281.99, 515 281.99" />
+<rect class="edge-label-bg" x="377.5" y="292" width="92" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="423.5" y="312.8">
+<tspan x="423.5" dy="0">接收请求</tspan>
+</text>
+</g>
+<g class="edge edge-1">
+<path class="pipe-flow" style="stroke: var(--flow-mint); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 1.9s;" d="M 755 281.99 C 854.56 281.99, 923.44 260, 1023 260" />
+<rect class="edge-label-bg" x="830.52" y="253" width="116.95" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="889" y="273.8">
+<tspan x="889" dy="0">生成执行计划</tspan>
+</text>
+</g>
+<g class="edge edge-2">
+<path class="pipe-flow" style="stroke: var(--flow-mint); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 1.8s;" d="M 1143 312 C 1143 366, 1143 357, 1143 411" />
+<rect class="edge-label-bg" x="1097" y="343.5" width="92" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="1143" y="364.3">
+<tspan x="1143" dy="0">授权执行</tspan>
+</text>
+</g>
+<g class="edge edge-3">
+<path class="pipe-flow" style="stroke: var(--flow-mint); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 2.1s;" d="M 1143 523 C 1143 703, 512 728, 332 728" />
+<rect class="edge-label-bg" x="759" y="675" width="92" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="805" y="695.8">
+<tspan x="805" dy="0">回传结果</tspan>
+</text>
+</g>
+<g class="edge edge-4">
+<path class="pipe-flow" style="stroke: var(--flow-coral); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 2.3s;" d="M 755 281.99 C 877.38 281.99, 900.62 467, 1023 467" />
+<rect class="edge-label-bg" x="836.94" y="356.5" width="104.12" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="889" y="377.3">
+<tspan x="889" dy="0">检索上下文</tspan>
+</text>
+</g>
+<g class="edge edge-5">
+<path class="pipe-flow" style="stroke: var(--flow-sky); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 2.6s;" d="M 1023 467 C 865.26 467, 635 495.73, 635 337.99" />
+<rect class="edge-label-bg" x="723.85" y="443.65" width="92" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="769.85" y="464.45">
+<tspan x="769.85" dy="0">补充历史</tspan>
+</text>
+</g>
+<g class="edge edge-6">
+<path class="pipe-flow" style="stroke: var(--flow-amber); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 2.4s;" d="M 635 337.99 C 635 391.99, 635 492.99, 635 546.99" />
+<rect class="edge-label-bg" x="589" y="424.49" width="92" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="635" y="445.29">
+<tspan x="635" dy="0">加载技能</tspan>
+</text>
+</g>
+<g class="edge edge-7">
+<path class="pipe-flow" style="stroke: var(--flow-amber); stroke-width: 2.91; stroke-dasharray: 6 7; animation-duration: 2.4s;" d="M 745 598.99 C 863.56 598.99, 904.44 467, 1023 467" />
+<rect class="edge-label-bg" x="838" y="515" width="92" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="884" y="535.8">
+<tspan x="884" dy="0">提供步骤</tspan>
+</text>
+</g>
+<g class="edge edge-8">
+<path class="pipe-flow" style="stroke: var(--flow-sky); stroke-width: 2.69; stroke-dasharray: 6 7; animation-duration: 2.2s;" d="M 1143 523 C 1143 577, 1143 722, 1143 776" />
+<rect class="edge-label-bg" x="1084.53" y="631.5" width="116.95" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="1143" y="652.3">
+<tspan x="1143" dy="0">分派并行任务</tspan>
+</text>
+</g>
+<g class="edge edge-9">
+<path class="pipe-flow" style="stroke: var(--flow-mint); stroke-width: 2.69; stroke-dasharray: 6 7; animation-duration: 2.2s;" d="M 1143 776 C 1143 722, 1143 577, 1143 523" />
+<rect class="edge-label-bg" x="1097" y="681.5" width="92" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="1143" y="702.3">
+<tspan x="1143" dy="0">汇总结果</tspan>
+</text>
+</g>
+<g class="edge edge-10">
+<path class="pipe-flow" style="stroke: var(--flow-sky); stroke-width: 3.14; stroke-dasharray: 6.27 7.53; animation-duration: 2s;" d="M 1263 467 C 1363.74 467, 1401.26 362, 1502 362" />
+<rect class="edge-label-bg" x="1315.65" y="396.5" width="133.69" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="1382.5" y="417.3">
+<tspan x="1382.5" dy="0">执行命令 / 读写</tspan>
+</text>
+</g>
+<g class="edge edge-11">
+<path class="pipe-flow" style="stroke: var(--flow-coral); stroke-width: 3.14; stroke-dasharray: 6.27 7.53; animation-duration: 2.3s;" d="M 1263 467 C 1373.54 467, 1391.46 642, 1502 642" />
+<rect class="edge-label-bg" x="1321.6" y="536.5" width="121.81" height="36" rx="16" />
+<text class="edge-label" style="font-size: 13.5px;" x="1382.5" y="557.3">
+<tspan x="1382.5" dy="0">调用外部 API</tspan>
+</text>
+</g>
+  </g>
+  <g class="nodes">
+    <g class="node" id="node-request">
+<path class="node-fill" style="fill: var(--sky);" d="M 164.88 286.78 H 280.88 A 52 52 0 0 1 332.88 338.78 V 338.78 A 52 52 0 0 1 280.88 390.78 H 164.88 A 52 52 0 0 1 112.88 338.78 V 338.78 A 52 52 0 0 1 164.88 286.78 Z" />
+<path class="node-stroke" d="M 164.88 286.78 H 280.88 A 52 52 0 0 1 332.88 338.78 V 338.78 A 52 52 0 0 1 280.88 390.78 H 164.88 A 52 52 0 0 1 112.88 338.78 V 338.78 A 52 52 0 0 1 164.88 286.78 Z" />
+<path class="node-stroke ghost" d="M 164.9 286.8 H 280.9 A 52 52 0 0 1 332.9 338.8 V 338.8 A 52 52 0 0 1 280.9 390.8 H 164.9 A 52 52 0 0 1 112.9 338.8 V 338.8 A 52 52 0 0 1 164.9 286.8 Z" />
+<text class="node-label" style="font-size: 20px;" x="222" y="317.56">
+<tspan x="222" dy="0">微信 / Chat</tspan>
+<tspan x="222" dy="23.6">用户请求</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="222" y="382.26">input channel</text>
+</g>
+<g class="node" id="node-result">
+<path class="node-fill" style="fill: var(--graphite);" d="M 163.24 675.35 H 279.24 A 52 52 0 0 1 331.24 727.35 V 727.35 A 52 52 0 0 1 279.24 779.35 H 163.24 A 52 52 0 0 1 111.24 727.35 V 727.35 A 52 52 0 0 1 163.24 675.35 Z" />
+<path class="node-stroke" d="M 163.24 675.35 H 279.24 A 52 52 0 0 1 331.24 727.35 V 727.35 A 52 52 0 0 1 279.24 779.35 H 163.24 A 52 52 0 0 1 111.24 727.35 V 727.35 A 52 52 0 0 1 163.24 675.35 Z" />
+<path class="node-stroke ghost" d="M 163.26 675.36 H 279.26 A 52 52 0 0 1 331.26 727.36 V 727.36 A 52 52 0 0 1 279.26 779.36 H 163.26 A 52 52 0 0 1 111.26 727.36 V 727.36 A 52 52 0 0 1 163.26 675.36 Z" />
+<text class="node-label" style="font-size: 20px;" x="222" y="707.56">
+<tspan x="222" dy="0">结果回传</tspan>
+<tspan x="222" dy="23.6">文本 / 图片 / 文件</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="222" y="772.26">output channel</text>
+</g>
+<g class="node" id="node-router">
+<path class="node-fill" style="fill: var(--mint);" d="M 534.2 225.3 H 734.2 A 20 20 0 0 1 754.2 245.3 V 317.3 A 20 20 0 0 1 734.2 337.3 H 534.2 A 20 20 0 0 1 514.2 317.3 V 245.3 A 20 20 0 0 1 534.2 225.3 Z" />
+<path class="node-stroke" d="M 534.2 225.3 H 734.2 A 20 20 0 0 1 754.2 245.3 V 317.3 A 20 20 0 0 1 734.2 337.3 H 534.2 A 20 20 0 0 1 514.2 317.3 V 245.3 A 20 20 0 0 1 534.2 225.3 Z" />
+<path class="node-stroke ghost" d="M 534.22 225.32 H 734.22 A 20 20 0 0 1 754.22 245.32 V 317.32 A 20 20 0 0 1 734.22 337.32 H 534.22 A 20 20 0 0 1 514.22 317.32 V 245.32 A 20 20 0 0 1 534.22 225.32 Z" />
+<text class="node-label" style="font-size: 20px;" x="635" y="261.56">
+<tspan x="635" dy="0">Hermes Agent</tspan>
+<tspan x="635" dy="23.6">编排与路由</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="635" y="326.26">intent parse + task split</text>
+</g>
+<g class="node" id="node-skills">
+<path class="node-fill" style="fill: var(--amber);" d="M 544.15 546.26 H 724.15 A 20 20 0 0 1 744.15 566.26 V 630.26 A 20 20 0 0 1 724.15 650.26 H 544.15 A 20 20 0 0 1 524.15 630.26 V 566.26 A 20 20 0 0 1 544.15 546.26 Z" />
+<path class="node-stroke" d="M 544.15 546.26 H 724.15 A 20 20 0 0 1 744.15 566.26 V 630.26 A 20 20 0 0 1 724.15 650.26 H 544.15 A 20 20 0 0 1 524.15 630.26 V 566.26 A 20 20 0 0 1 544.15 546.26 Z" />
+<path class="node-stroke ghost" d="M 544.16 546.27 H 724.16 A 20 20 0 0 1 744.16 566.27 V 630.27 A 20 20 0 0 1 724.16 650.27 H 544.16 A 20 20 0 0 1 524.16 630.27 V 566.27 A 20 20 0 0 1 544.16 546.27 Z" />
+<text class="node-label" style="font-size: 20px;" x="635" y="578.56">
+<tspan x="635" dy="0">Skills</tspan>
+<tspan x="635" dy="23.6">流程知识库</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="635" y="643.26">reusable workflows</text>
+</g>
+<g class="node" id="node-policy">
+<path class="node-fill" style="fill: var(--graphite);" d="M 1042.13 207.25 H 1242.13 A 20 20 0 0 1 1262.13 227.25 V 291.25 A 20 20 0 0 1 1242.13 311.25 H 1042.13 A 20 20 0 0 1 1022.13 291.25 V 227.25 A 20 20 0 0 1 1042.13 207.25 Z" />
+<path class="node-stroke" d="M 1042.13 207.25 H 1242.13 A 20 20 0 0 1 1262.13 227.25 V 291.25 A 20 20 0 0 1 1242.13 311.25 H 1042.13 A 20 20 0 0 1 1022.13 291.25 V 227.25 A 20 20 0 0 1 1042.13 207.25 Z" />
+<path class="node-stroke ghost" d="M 1042.15 207.27 H 1242.15 A 20 20 0 0 1 1262.15 227.27 V 291.27 A 20 20 0 0 1 1242.15 311.27 H 1042.15 A 20 20 0 0 1 1022.15 291.27 V 227.27 A 20 20 0 0 1 1042.15 207.27 Z" />
+<text class="node-label" style="font-size: 20px;" x="1143" y="239.56">
+<tspan x="1143" dy="0">安全与策略</tspan>
+<tspan x="1143" dy="23.6">约束</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="1143" y="304.26">guardrails</text>
+</g>
+<g class="node" id="node-memory">
+<path class="node-fill" style="fill: var(--coral);" d="M 1042.26 414.36 H 1242.26 A 20 20 0 0 1 1262.26 434.36 V 498.36 A 20 20 0 0 1 1242.26 518.36 H 1042.26 A 20 20 0 0 1 1022.26 498.36 V 434.36 A 20 20 0 0 1 1042.26 414.36 Z" />
+<path class="node-stroke" d="M 1042.26 414.36 H 1242.26 A 20 20 0 0 1 1262.26 434.36 V 498.36 A 20 20 0 0 1 1242.26 518.36 H 1042.26 A 20 20 0 0 1 1022.26 498.36 V 434.36 A 20 20 0 0 1 1042.26 414.36 Z" />
+<path class="node-stroke ghost" d="M 1042.28 414.38 H 1242.28 A 20 20 0 0 1 1262.28 434.38 V 498.38 A 20 20 0 0 1 1242.28 518.38 H 1042.28 A 20 20 0 0 1 1022.28 498.38 V 434.38 A 20 20 0 0 1 1042.28 414.38 Z" />
+<text class="node-label" style="font-size: 20px;" x="1143" y="446.56">
+<tspan x="1143" dy="0">Memory +</tspan>
+<tspan x="1143" dy="23.6">Session Search</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="1143" y="511.26">history + context</text>
+</g>
+<g class="node" id="node-tool">
+<path class="node-fill" style="fill: var(--sky);" d="M 1042.6 410.65 H 1242.6 A 20 20 0 0 1 1262.6 430.65 V 502.65 A 20 20 0 0 1 1242.6 522.65 H 1042.6 A 20 20 0 0 1 1022.6 502.65 V 430.65 A 20 20 0 0 1 1042.6 410.65 Z" />
+<path class="node-stroke" d="M 1042.6 410.65 H 1242.6 A 20 20 0 0 1 1262.6 430.65 V 502.65 A 20 20 0 0 1 1242.6 522.65 H 1042.6 A 20 20 0 0 1 1022.6 502.65 V 430.65 A 20 20 0 0 1 1042.6 410.65 Z" />
+<path class="node-stroke ghost" d="M 1042.61 410.67 H 1242.61 A 20 20 0 0 1 1262.61 430.67 V 502.67 A 20 20 0 0 1 1242.61 522.67 H 1042.61 A 20 20 0 0 1 1022.61 502.67 V 430.67 A 20 20 0 0 1 1042.61 410.67 Z" />
+<text class="node-label" style="font-size: 20px;" x="1143" y="446.56">
+<tspan x="1143" dy="0">工具层</tspan>
+<tspan x="1143" dy="23.6">terminal / file / w…</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="1143" y="511.26">execute actions</text>
+</g>
+<g class="node" id="node-subagents">
+<path class="node-fill" style="fill: var(--mint);" d="M 1082.31 777.16 H 1206.31 A 48 48 0 0 1 1254.31 825.16 V 825.16 A 48 48 0 0 1 1206.31 873.16 H 1082.31 A 48 48 0 0 1 1034.31 825.16 V 825.16 A 48 48 0 0 1 1082.31 777.16 Z" />
+<path class="node-stroke" d="M 1082.31 777.16 H 1206.31 A 48 48 0 0 1 1254.31 825.16 V 825.16 A 48 48 0 0 1 1206.31 873.16 H 1082.31 A 48 48 0 0 1 1034.31 825.16 V 825.16 A 48 48 0 0 1 1082.31 777.16 Z" />
+<path class="node-stroke ghost" d="M 1082.33 777.18 H 1206.33 A 48 48 0 0 1 1254.33 825.18 V 825.18 A 48 48 0 0 1 1206.33 873.18 H 1082.33 A 48 48 0 0 1 1034.33 825.18 V 825.18 A 48 48 0 0 1 1082.33 777.18 Z" />
+<text class="node-label" style="font-size: 20px;" x="1143" y="815.36">
+<tspan x="1143" dy="0">Subagents并行任务</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="1143" y="856.46">delegate task</text>
+</g>
+<g class="node" id="node-local">
+<path class="node-fill" style="fill: var(--sand);" d="M 1522.73 306.65 H 1662.73 A 20 20 0 0 1 1682.73 326.65 V 398.65 A 20 20 0 0 1 1662.73 418.65 H 1522.73 A 20 20 0 0 1 1502.73 398.65 V 326.65 A 20 20 0 0 1 1522.73 306.65 Z" />
+<path class="node-stroke" d="M 1522.73 306.65 H 1662.73 A 20 20 0 0 1 1682.73 326.65 V 398.65 A 20 20 0 0 1 1662.73 418.65 H 1522.73 A 20 20 0 0 1 1502.73 398.65 V 326.65 A 20 20 0 0 1 1522.73 306.65 Z" />
+<path class="node-stroke ghost" d="M 1522.75 306.66 H 1662.75 A 20 20 0 0 1 1682.75 326.66 V 398.66 A 20 20 0 0 1 1662.75 418.66 H 1522.75 A 20 20 0 0 1 1502.75 398.66 V 326.66 A 20 20 0 0 1 1522.75 306.66 Z" />
+<text class="node-label" style="font-size: 20px;" x="1592" y="341.56">
+<tspan x="1592" dy="0">本地系统</tspan>
+<tspan x="1592" dy="23.6">文件 / 进程 /…</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="1592" y="406.26">linux runtime</text>
+</g>
+<g class="node" id="node-platform">
+<path class="node-fill" style="fill: var(--coral);" d="M 1521.37 585.46 H 1661.37 A 20 20 0 0 1 1681.37 605.46 V 677.46 A 20 20 0 0 1 1661.37 697.46 H 1521.37 A 20 20 0 0 1 1501.37 677.46 V 605.46 A 20 20 0 0 1 1521.37 585.46 Z" />
+<path class="node-stroke" d="M 1521.37 585.46 H 1661.37 A 20 20 0 0 1 1681.37 605.46 V 677.46 A 20 20 0 0 1 1661.37 697.46 H 1521.37 A 20 20 0 0 1 1501.37 677.46 V 605.46 A 20 20 0 0 1 1521.37 585.46 Z" />
+<path class="node-stroke ghost" d="M 1521.39 585.48 H 1661.39 A 20 20 0 0 1 1681.39 605.48 V 677.48 A 20 20 0 0 1 1661.39 697.48 H 1521.39 A 20 20 0 0 1 1501.39 677.48 V 605.48 A 20 20 0 0 1 1521.39 585.48 Z" />
+<text class="node-label" style="font-size: 20px;" x="1592" y="621.56">
+<tspan x="1592" dy="0">外部平台</tspan>
+<tspan x="1592" dy="23.6">GitHub / Not…</tspan>
+</text>
+<text class="node-caption" style="font-size: 12.5px;" x="1592" y="686.26">integrations</text>
+</g>
+  </g>
+</svg>

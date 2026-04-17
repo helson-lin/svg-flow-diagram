@@ -1279,46 +1279,53 @@ def choose_label_rect(
     cp1 = geometry["cp1"]
     cp2 = geometry["cp2"]
     end = geometry["end"]
-    # Keep labels centered on the middle section of the edge by default.
-    t_value = 0.5
-    point = cubic_point(start, cp1, cp2, end, t_value)
-    normal = unit_normal(cubic_derivative(start, cp1, cp2, end, t_value))
-    tangent = cubic_derivative(start, cp1, cp2, end, t_value)
-    tan_len = math.hypot(tangent[0], tangent[1]) or 1.0
-    tx = tangent[0] / tan_len
-    ty = tangent[1] / tan_len
-    normal_offsets = (0.0, 18.0, -18.0, 30.0, -30.0, 44.0, -44.0, 60.0, -60.0)
-    tangent_offsets = (0.0, -20.0, 20.0, -34.0, 34.0, -50.0, 50.0)
+    t_values = (0.34, 0.42, 0.5, 0.58, 0.66)
+    normal_offsets = (18.0, -18.0, 30.0, -30.0, 44.0, -44.0, 60.0, -60.0, 84.0, -84.0, 112.0, -112.0, 0.0)
+    tangent_offsets = (0.0, -20.0, 20.0, -34.0, 34.0, -50.0, 50.0, -72.0, 72.0, -96.0, 96.0)
     candidates: list[tuple[float, tuple[float, float, float, float]]] = []
 
-    for tangent_offset in tangent_offsets:
-        for normal_offset in normal_offsets:
-            rect = rect_from_center(
-                point[0] + (tx * tangent_offset) + (normal[0] * normal_offset),
-                point[1] + (ty * tangent_offset) + (normal[1] * normal_offset),
-                label_width,
-                label_height,
-            )
-            score = 0.0
-            score += off_canvas_penalty(
-                rect,
-                canvas_width,
-                canvas_height,
-                LABEL_OUTER_PADDING,
-            ) * 140.0
-            score += abs(normal_offset) * 0.9
-            score += abs(tangent_offset) * 0.55
-            for node_rect in node_rects:
-                if rect_intersects(rect, node_rect, 0.0):
-                    score += 8000.0
-            for used_rect in used_label_rects:
-                if rect_intersects(rect, used_rect, 0.0):
-                    score += 12000.0
-            candidates.append((score, rect))
+    for t_value in t_values:
+        point = cubic_point(start, cp1, cp2, end, t_value)
+        tangent = cubic_derivative(start, cp1, cp2, end, t_value)
+        normal = unit_normal(tangent)
+        tan_len = math.hypot(tangent[0], tangent[1]) or 1.0
+        tx = tangent[0] / tan_len
+        ty = tangent[1] / tan_len
+
+        for tangent_offset in tangent_offsets:
+            for normal_offset in normal_offsets:
+                rect = rect_from_center(
+                    point[0] + (tx * tangent_offset) + (normal[0] * normal_offset),
+                    point[1] + (ty * tangent_offset) + (normal[1] * normal_offset),
+                    label_width,
+                    label_height,
+                )
+                score = 0.0
+                score += off_canvas_penalty(
+                    rect,
+                    canvas_width,
+                    canvas_height,
+                    LABEL_OUTER_PADDING,
+                ) * 140.0
+                score += abs(normal_offset) * 0.9
+                score += abs(tangent_offset) * 0.55
+                score += abs(t_value - 0.5) * 24.0
+                for node_rect in node_rects:
+                    if rect_intersects(rect, node_rect, LABEL_NODE_MARGIN):
+                        score += 18000.0
+                        score += rect_overlap_area(rect, node_rect, LABEL_NODE_MARGIN) * 150.0
+                for used_rect in used_label_rects:
+                    if rect_intersects(rect, used_rect, LABEL_LABEL_MARGIN):
+                        score += 20000.0
+                if label_hits_edge(rect, edge_samples):
+                    score += 6000.0
+                candidates.append((score, rect))
 
     if candidates:
         return min(candidates, key=lambda item: item[0])[1]
-    return rect_from_center(point[0], point[1], label_width, label_height)
+
+    midpoint = cubic_point(start, cp1, cp2, end, 0.5)
+    return rect_from_center(midpoint[0], midpoint[1], label_width, label_height)
 
 
 def separate_label_from_nodes(
@@ -1433,6 +1440,25 @@ def layout_edge_labels(
             used_label_rects,
             edge_samples,
         )
+        rect = separate_label_from_nodes(rect, node_rects, width, height)
+        rect = separate_label_from_existing_labels(rect, used_label_rects, width, height)
+        if label_hits_edge(rect, edge_samples):
+            fallback = separate_label_from_nodes(
+                clamp_rect_to_canvas(rect, width, height),
+                node_rects,
+                width,
+                height,
+                margin=max(LABEL_NODE_MARGIN, 26.0),
+            )
+            fallback = separate_label_from_existing_labels(
+                fallback,
+                used_label_rects,
+                width,
+                height,
+                margin=max(LABEL_LABEL_MARGIN, 18.0),
+            )
+            if not label_hits_edge(fallback, edge_samples):
+                rect = fallback
         used_label_rects.append(rect)
         placements.append({"rect": rect, "lines": lines})
     return placements

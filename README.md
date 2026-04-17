@@ -18,7 +18,7 @@
 
 ### Hermes Agent 架构图示例
 
-![hermes-agent-architecture](/Volumes/CC/temp-project/pear/artifacts/hermess-agent-architecture-v3.svg)
+![hermes-agent-architecture](assets/hermess-agent-architecture-v3.svg)
 
 ## 安装
 

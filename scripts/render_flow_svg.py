@@ -2103,28 +2103,17 @@ def render_svg(spec: dict) -> str:
 """
 
 
-def drawio_html_label(text: str | None, caption: str | None = None) -> str:
-    body = "<br/>".join(html.escape(line) for line in text_lines(text) or [" "])
-    parts = [
-        "<div style='font-size:18px;font-weight:600;line-height:1.25;'>",
-        body,
-        "</div>",
-    ]
+def drawio_plain_label(text: str | None, caption: str | None = None) -> str:
+    lines = text_lines(text) or [" "]
     if caption:
-        parts.extend(
-            [
-                "<div style='margin-top:6px;font-size:11px;font-weight:700;color:#7A6F66;text-transform:uppercase;'>",
-                html.escape(caption),
-                "</div>",
-            ]
-        )
-    return "".join(parts)
+        lines.append(str(caption).upper())
+    return "\n".join(lines)
 
 
 def drawio_text_style(font_size: int, color: str, bold: bool = False) -> str:
     style = [
         "text",
-        "html=1",
+        "html=0",
         "strokeColor=none",
         "fillColor=none",
         "align=left",
@@ -2143,7 +2132,7 @@ def drawio_node_style(node: dict, theme: dict[str, str]) -> str:
     fill = theme.get(TONE_TO_FILL.get(tone, "sand"), DEFAULT_THEME["sand"])
     style = [
         "whiteSpace=wrap",
-        "html=1",
+        "html=0",
         f"fillColor={fill}",
         f"strokeColor={theme['ink']}",
         "strokeWidth=2",
@@ -2164,7 +2153,7 @@ def drawio_node_style(node: dict, theme: dict[str, str]) -> str:
 
 def drawio_group_style(theme: dict[str, str]) -> str:
     return (
-        "swimlane;html=1;rounded=1;arcSize=12;horizontal=0;"
+        "swimlane;html=0;rounded=1;arcSize=12;horizontal=0;"
         "startSize=34;swimlaneFillColor=none;fillColor=none;"
         f"strokeColor={theme['grid']};fontColor={theme['muted']};"
         "fontSize=13;fontStyle=1;dashed=1;dashPattern=10 12;"
@@ -2192,7 +2181,7 @@ def drawio_edge_style(edge: dict, theme: dict[str, str]) -> str:
         "rounded=1",
         "orthogonalLoop=1",
         "jettySize=auto",
-        "html=1",
+        "html=0",
         f"strokeColor={stroke}",
         f"strokeWidth={width}",
         "dashed=1",
@@ -2282,7 +2271,7 @@ def render_drawio(spec: dict) -> str:
             "mxCell",
             attrib={
                 "id": "title",
-                "value": html.escape(title),
+                "value": title,
                 "style": drawio_text_style(26, theme["ink"], bold=True),
                 "vertex": "1",
                 "parent": "1",
@@ -2305,7 +2294,7 @@ def render_drawio(spec: dict) -> str:
             "mxCell",
             attrib={
                 "id": "subtitle",
-                "value": html.escape(subtitle),
+                "value": subtitle,
                 "style": drawio_text_style(14, theme["muted"]),
                 "vertex": "1",
                 "parent": "1",
@@ -2363,7 +2352,7 @@ def render_drawio(spec: dict) -> str:
             "mxCell",
             attrib={
                 "id": f"node-{node['id']}",
-                "value": drawio_html_label(
+                "value": drawio_plain_label(
                     str(node.get("label", "")),
                     str(node.get("caption", "")).strip() or None,
                 ),
@@ -2390,7 +2379,7 @@ def render_drawio(spec: dict) -> str:
             "mxCell",
             attrib={
                 "id": f"edge-{index}",
-                "value": html.escape(str(edge.get("label", ""))) if edge.get("label") else "",
+                "value": str(edge.get("label", "")) if edge.get("label") else "",
                 "style": drawio_edge_style(edge, theme),
                 "edge": "1",
                 "parent": "1",

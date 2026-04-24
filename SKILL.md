@@ -273,6 +273,8 @@ For draw.io output, keep these expectations:
 - preserve editability and grouping over perfect sketch-style fidelity
 - keep nodes, groups, titles, and edge labels editable as native draw.io cells
 - keep the same rough layout and group membership as the SVG output from the same spec
+- keep draw.io cell values as plain text; do not embed inline HTML or CSS in `.drawio` values
+- use only supported `mxCell.style` keys for draw.io appearance
 
 ## References
 

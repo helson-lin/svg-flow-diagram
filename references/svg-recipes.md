@@ -15,6 +15,13 @@ Typical mapping:
 - "editable draw.io" / "diagrams.net" -> `.svg` + `.drawio`
 - both preview and editability -> `.svg` + `.png` + `.drawio`
 
+For `.drawio` output, keep the file conservative:
+
+- keep `mxCell.value` as plain text
+- do not embed HTML fragments like `<div>` or `<span>`
+- do not embed inline CSS like `style='...'` inside values
+- keep visual styling in `mxCell.style` only
+
 ## CLI
 
 ```bash

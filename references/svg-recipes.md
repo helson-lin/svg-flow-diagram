@@ -1,6 +1,19 @@
 # SVG Recipes
 
-Use this file when you need the JSON input format or reusable SVG implementation details.
+Use this file when you need the JSON input format or reusable SVG / draw.io implementation details.
+
+## Output Defaults
+
+- Default artifact: `.svg`
+- Preview artifact when needed: `.png` plus `.flat.svg`
+- Editable artifact when requested: `.drawio`
+
+Typical mapping:
+
+- no explicit format request -> `.svg`
+- "send me a preview" / "发我图片" -> `.svg` + `.png`
+- "editable draw.io" / "diagrams.net" -> `.svg` + `.drawio`
+- both preview and editability -> `.svg` + `.png` + `.drawio`
 
 ## CLI
 
@@ -22,6 +35,17 @@ python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
   --flat-svg-out /absolute/path/to/output.flat.svg \
   --png-out /absolute/path/to/output.png
 ```
+
+For editable diagrams.net / draw.io delivery, add a `.drawio` output:
+
+```bash
+python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
+  /absolute/path/to/spec.json \
+  /absolute/path/to/output.svg \
+  --drawio-out /absolute/path/to/output.drawio
+```
+
+You can combine all outputs in one invocation when the user wants both preview and editability.
 
 If the skill was provided with an explicit filesystem path, use that path as `SKILL_DIR` instead of assuming the default install location.
 
@@ -93,15 +117,39 @@ Use groups to frame stages or swimlanes:
 ```json
 {
   "id": "lane-a",
-  "title": "Discovery",
-  "x": 80,
-  "y": 150,
-  "w": 430,
-  "h": 520
+  "title": "Discovery"
 }
 ```
 
-When multiple nodes belong to the same group, keep their centers roughly aligned by row or column. The renderer now snaps near-aligned nodes inside a group and prefers edge routes with fewer crossings, so provide group boxes and approximate grid placement instead of tiny per-node offsets.
+Assign membership on the node, not by hoping the node lands inside the frame:
+
+```json
+{
+  "id": "score",
+  "label": "Score\nOpportunity",
+  "x": 620,
+  "y": 220,
+  "w": 220,
+  "h": 96,
+  "tone": "mint",
+  "group": "lane-a"
+}
+```
+
+The renderer treats group bounds as content-driven containers:
+
+- `node.group` is the primary way to associate nodes with groups
+- `groups[].x/y/w/h` are optional seed hints for early layout only
+- `groups[].align` can force `row`, `column`, or `auto`
+- `groups[].gap` can raise the minimum spacing between members in a forced row/column layout
+- `groups[].phase` can align multiple peer groups to a shared baseline
+- `groups[].uniformSize=false` can opt out of group-level size normalization
+- the final group frame is auto-sized from member-node bounds plus inner padding
+- the emitted SVG nests each grouped node `<g>` inside its owning group `<g>`
+
+When multiple nodes belong to the same group, provide approximate row/column intent in the input positions. If the group already reads as one horizontal row, the renderer snaps all member nodes onto one shared y-center and redistributes them left-to-right with standard flowchart spacing. If it reads as one vertical column, it snaps them onto one shared x-center and redistributes them top-to-bottom. Mixed layouts stay mixed unless you explicitly set `groups[].align`.
+
+If several groups should visually read as the same phase, give them the same `phase` value. Column groups in the same phase will share the same top baseline; row groups in the same phase will share the same left baseline. This keeps multi-column process diagrams from looking staggered.
 
 ## Relationship Pattern
 

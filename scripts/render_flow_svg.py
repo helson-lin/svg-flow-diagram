@@ -10,6 +10,7 @@ import math
 import shutil
 import subprocess
 import unicodedata
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 DEFAULT_THEME = {
@@ -87,6 +88,9 @@ EDGE_LABEL_PAD_Y = 10.0
 GROUP_INNER_PAD_X = 42.0
 GROUP_INNER_PAD_TOP = 62.0
 GROUP_INNER_PAD_BOTTOM = 34.0
+GROUP_ROW_GAP = 72.0
+GROUP_COLUMN_GAP = 44.0
+GROUP_PHASE_ALIGN_THRESHOLD = 140.0
 ALIGN_SNAP_THRESHOLD = 120.0
 EDGE_CROSSING_PENALTY = 7800.0
 EDGE_NODE_OVERLAP_PENALTY = 4200.0
@@ -107,6 +111,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--png-out",
         help="Optional path to a PNG preview. Requires rsvg-convert or magick.",
+    )
+    parser.add_argument(
+        "--drawio-out",
+        help="Optional path to an editable draw.io `.drawio` file.",
     )
     return parser.parse_args()
 
@@ -686,20 +694,101 @@ def clamp_nodes_to_canvas(
         node["y"] = max(y, min_top)
 
 
+def shift_content_into_canvas(
+    nodes_list: list[dict],
+    groups: list[dict],
+    min_left: float = CANVAS_SIDE_PADDING,
+    min_top: float = 0.0,
+) -> None:
+    if not nodes_list and not groups:
+        return
+    content_left = min(
+        [float(node["x"]) for node in nodes_list]
+        + [float(group["x"]) for group in groups]
+    )
+    content_top = min(
+        [float(node["y"]) for node in nodes_list]
+        + [float(group["y"]) for group in groups]
+    )
+    delta_x = max(0.0, min_left - content_left)
+    delta_y = max(0.0, min_top - content_top)
+    if delta_x == 0.0 and delta_y == 0.0:
+        return
+    for node in nodes_list:
+        node["x"] = float(node["x"]) + delta_x
+        node["y"] = float(node["y"]) + delta_y
+    for group in groups:
+        group["x"] = float(group["x"]) + delta_x
+        group["y"] = float(group["y"]) + delta_y
+
+
 def node_center(node: dict) -> tuple[float, float]:
     return (float(node["x"]) + float(node["w"]) / 2, float(node["y"]) + float(node["h"]) / 2)
+
+
+def groups_by_id(groups: list[dict]) -> dict[str, dict]:
+    return {str(group["id"]): group for group in groups if group.get("id")}
+
+
+def seed_group_boxes(nodes_list: list[dict], groups: list[dict]) -> None:
+    indexed_groups = groups_by_id(groups)
+    grouped: dict[str, list[dict]] = {}
+    for node in nodes_list:
+        explicit_group = node.get("group") or node.get("groupId")
+        if explicit_group is None:
+            continue
+        group = indexed_groups.get(str(explicit_group))
+        if not group:
+            continue
+        grouped.setdefault(str(group["id"]), []).append(node)
+
+    for group in groups:
+        members = grouped.get(str(group.get("id")), [])
+        if members:
+            left = min(float(node["x"]) for node in members)
+            top = min(float(node["y"]) for node in members)
+            right = max(float(node["x"]) + float(node["w"]) for node in members)
+            bottom = max(float(node["y"]) + float(node["h"]) for node in members)
+            seeded = {
+                "x": left - GROUP_INNER_PAD_X,
+                "y": top - GROUP_INNER_PAD_TOP,
+                "w": (right - left) + (GROUP_INNER_PAD_X * 2),
+                "h": (bottom - top) + GROUP_INNER_PAD_TOP + GROUP_INNER_PAD_BOTTOM,
+            }
+        else:
+            seeded = {
+                "x": CANVAS_SIDE_PADDING,
+                "y": 160.0,
+                "w": 320.0,
+                "h": 180.0,
+            }
+        for key, value in seeded.items():
+            group[key] = float(group.get(key, value))
+        group.setdefault("_seed_x", float(group["x"]))
+        group.setdefault("_seed_y", float(group["y"]))
 
 
 def node_group_map(
     nodes_list: list[dict], groups: list[dict]
 ) -> dict[str, dict]:
     memberships: dict[str, dict] = {}
+    indexed_groups = groups_by_id(groups)
     for node in nodes_list:
+        explicit_group = node.get("group") or node.get("groupId")
+        if explicit_group is not None:
+            group = indexed_groups.get(str(explicit_group))
+            if group:
+                memberships[node["id"]] = group
+                continue
         center = node_center(node)
+        containing: list[dict] = []
         for group in groups:
             if point_in_group(center, group):
-                memberships[node["id"]] = group
-                break
+                containing.append(group)
+        if containing:
+            memberships[node["id"]] = min(
+                containing, key=lambda group: float(group["w"]) * float(group["h"])
+            )
     return memberships
 
 
@@ -741,27 +830,247 @@ def snap_axis_positions(
                 node[axis] = target
 
 
-def clamp_nodes_to_groups(
+def axis_cluster_count(
+    nodes: list[dict], axis: str, threshold: float = ALIGN_SNAP_THRESHOLD
+) -> int:
+    if not nodes:
+        return 0
+
+    def axis_value(node: dict) -> float:
+        if axis == "x":
+            return float(node["x"]) + float(node["w"]) / 2
+        if axis == "y":
+            return float(node["y"]) + float(node["h"]) / 2
+        return float(node[axis])
+
+    ordered = sorted(axis_value(node) for node in nodes)
+    clusters = 1
+    anchor = ordered[0]
+    cluster_size = 1
+    for value in ordered[1:]:
+        if abs(value - anchor) <= threshold:
+            cluster_size += 1
+            anchor = ((anchor * (cluster_size - 1)) + value) / cluster_size
+        else:
+            clusters += 1
+            anchor = value
+            cluster_size = 1
+    return clusters
+
+
+def node_center_on_axis(node: dict, axis: str) -> float:
+    if axis == "x":
+        return float(node["x"]) + float(node["w"]) / 2
+    if axis == "y":
+        return float(node["y"]) + float(node["h"]) / 2
+    return float(node[axis])
+
+
+def set_node_center_on_axis(node: dict, axis: str, center: float) -> None:
+    if axis == "x":
+        node["x"] = center - (float(node["w"]) / 2)
+    elif axis == "y":
+        node["y"] = center - (float(node["h"]) / 2)
+    else:
+        node[axis] = center
+
+
+def normalize_group_align(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in {"row", "horizontal", "h"}:
+        return "row"
+    if text in {"column", "vertical", "v"}:
+        return "column"
+    if text in {"auto", ""}:
+        return "auto"
+    return None
+
+
+def infer_group_alignment(
+    group: dict, members: list[dict], threshold: float = ALIGN_SNAP_THRESHOLD
+) -> str | None:
+    resolved = normalize_group_align(group.get("_resolved_align"))
+    if resolved in {"row", "column"}:
+        return resolved
+    explicit = normalize_group_align(group.get("align"))
+    if explicit in {"row", "column"}:
+        group["_resolved_align"] = explicit
+        return explicit
+    if len(members) < 2:
+        return None
+
+    x_clusters = axis_cluster_count(members, "x", threshold=threshold)
+    y_clusters = axis_cluster_count(members, "y", threshold=threshold)
+
+    if y_clusters == 1 and x_clusters > 1:
+        group["_resolved_align"] = "row"
+        return "row"
+    if x_clusters == 1 and y_clusters > 1:
+        group["_resolved_align"] = "column"
+        return "column"
+
+    # Only auto-lock a single axis when the current layout already reads as a row
+    # or a column. Mixed layouts should keep their existing geometry.
+    return None
+
+
+def normalize_group_member_sizes(members: list[dict], group: dict | None = None) -> None:
+    if len(members) < 2:
+        return
+    if group is not None and group.get("uniformSize") is False:
+        return
+    buckets: dict[str, list[dict]] = {}
+    for node in members:
+        shape = str(node.get("shape", "rect"))
+        buckets.setdefault(shape, []).append(node)
+    for bucket in buckets.values():
+        if len(bucket) < 2:
+            continue
+        target_w = max(float(node["w"]) for node in bucket)
+        target_h = max(float(node["h"]) for node in bucket)
+        for node in bucket:
+            cx, cy = node_center(node)
+            node["w"] = target_w
+            node["h"] = target_h
+            set_node_center_on_axis(node, "x", cx)
+            set_node_center_on_axis(node, "y", cy)
+
+
+def normalize_group_members(
+    members: list[dict], alignment: str, group: dict | None = None
+) -> None:
+    if len(members) < 2:
+        return
+    gap_override = None if group is None else group.get("gap")
+    gap = max(
+        GROUP_ROW_GAP if alignment == "row" else GROUP_COLUMN_GAP,
+        float(gap_override) if gap_override is not None else 0.0,
+    )
+    if alignment == "row":
+        ordered = sorted(members, key=lambda node: node_center_on_axis(node, "x"))
+        target_cross = round(
+            sum(node_center_on_axis(node, "y") for node in ordered) / len(ordered)
+        )
+        total_primary = sum(float(node["w"]) for node in ordered) + (gap * (len(ordered) - 1))
+        overall_center = (
+            min(float(node["x"]) for node in ordered)
+            + max(float(node["x"]) + float(node["w"]) for node in ordered)
+        ) / 2.0
+        cursor = overall_center - (total_primary / 2.0)
+        for node in ordered:
+            node["x"] = cursor
+            set_node_center_on_axis(node, "y", target_cross)
+            cursor += float(node["w"]) + gap
+        return
+    if alignment == "column":
+        ordered = sorted(members, key=lambda node: node_center_on_axis(node, "y"))
+        target_cross = round(
+            sum(node_center_on_axis(node, "x") for node in ordered) / len(ordered)
+        )
+        total_primary = sum(float(node["h"]) for node in ordered) + (gap * (len(ordered) - 1))
+        overall_center = (
+            min(float(node["y"]) for node in ordered)
+            + max(float(node["y"]) + float(node["h"]) for node in ordered)
+        ) / 2.0
+        cursor = overall_center - (total_primary / 2.0)
+        for node in ordered:
+            node["y"] = cursor
+            set_node_center_on_axis(node, "x", target_cross)
+            cursor += float(node["h"]) + gap
+
+
+def normalize_group_phase_baselines(
+    groups: list[dict], grouped: dict[str, list[dict]]
+) -> None:
+    aligned_groups: dict[str, list[dict]] = {"row": [], "column": []}
+    for group in groups:
+        members = grouped.get(str(group["id"]), [])
+        if len(members) < 2:
+            continue
+        alignment = normalize_group_align(group.get("_resolved_align")) or normalize_group_align(group.get("align"))
+        if alignment in {"row", "column"}:
+            aligned_groups[alignment].append(group)
+
+    for alignment, candidates in aligned_groups.items():
+        if len(candidates) < 2:
+            continue
+        axis = "y" if alignment == "column" else "x"
+        ordered = sorted(candidates, key=lambda group: float(group.get(f"_seed_{axis}", group[axis])))
+        clusters: list[list[dict]] = []
+        for group in ordered:
+            anchor = float(group.get(f"_seed_{axis}", group[axis]))
+            if not clusters:
+                clusters.append([group])
+                continue
+            cluster = clusters[-1]
+            cluster_anchor = sum(
+                float(item.get(f"_seed_{axis}", item[axis])) for item in cluster
+            ) / len(cluster)
+            if abs(anchor - cluster_anchor) <= GROUP_PHASE_ALIGN_THRESHOLD:
+                cluster.append(group)
+            else:
+                clusters.append([group])
+
+        for cluster in clusters:
+            if len(cluster) < 2:
+                continue
+            if alignment == "column":
+                target = round(
+                    sum(min(float(node["y"]) for node in grouped[str(group["id"])]) for group in cluster)
+                    / len(cluster)
+                )
+                for group in cluster:
+                    members = grouped[str(group["id"])]
+                    current = min(float(node["y"]) for node in members)
+                    delta = target - current
+                    for node in members:
+                        node["y"] = float(node["y"]) + delta
+            else:
+                target = round(
+                    sum(min(float(node["x"]) for node in grouped[str(group["id"])]) for group in cluster)
+                    / len(cluster)
+                )
+                for group in cluster:
+                    members = grouped[str(group["id"])]
+                    current = min(float(node["x"]) for node in members)
+                    delta = target - current
+                    for node in members:
+                        node["x"] = float(node["x"]) + delta
+
+
+def is_grid_locked_group(group: dict | None) -> bool:
+    if not group:
+        return False
+    alignment = normalize_group_align(group.get("_resolved_align")) or normalize_group_align(group.get("align"))
+    return alignment in {"row", "column"}
+
+
+def autosize_groups(
     nodes_list: list[dict], groups: list[dict], memberships: dict[str, dict]
 ) -> None:
-    if not groups or not memberships:
+    if not groups:
         return
+    grouped: dict[str, list[dict]] = {}
     for node in nodes_list:
         group = memberships.get(node["id"])
         if not group:
             continue
-        gx = float(group["x"])
-        gy = float(group["y"])
-        gw = float(group["w"])
-        gh = float(group["h"])
-        w = float(node["w"])
-        h = float(node["h"])
-        min_x = gx + GROUP_INNER_PAD_X
-        max_x = gx + gw - GROUP_INNER_PAD_X - w
-        min_y = gy + GROUP_INNER_PAD_TOP
-        max_y = gy + gh - GROUP_INNER_PAD_BOTTOM - h
-        node["x"] = min(max(float(node["x"]), min_x), max_x if max_x >= min_x else min_x)
-        node["y"] = min(max(float(node["y"]), min_y), max_y if max_y >= min_y else min_y)
+        grouped.setdefault(str(group["id"]), []).append(node)
+
+    for group in groups:
+        members = grouped.get(str(group["id"]), [])
+        if not members:
+            continue
+        left = min(float(node["x"]) for node in members)
+        top = min(float(node["y"]) for node in members)
+        right = max(float(node["x"]) + float(node["w"]) for node in members)
+        bottom = max(float(node["y"]) + float(node["h"]) for node in members)
+        group["x"] = left - GROUP_INNER_PAD_X
+        group["y"] = top - GROUP_INNER_PAD_TOP
+        group["w"] = (right - left) + (GROUP_INNER_PAD_X * 2)
+        group["h"] = (bottom - top) + GROUP_INNER_PAD_TOP + GROUP_INNER_PAD_BOTTOM
 
 
 def align_nodes_within_groups(nodes_list: list[dict], groups: list[dict]) -> dict[str, dict]:
@@ -779,9 +1088,14 @@ def align_nodes_within_groups(nodes_list: list[dict], groups: list[dict]) -> dic
         members = grouped.get(group["id"], [])
         if len(members) < 2:
             continue
-        snap_axis_positions(members, "x")
-        snap_axis_positions(members, "y")
-    clamp_nodes_to_groups(nodes_list, groups, memberships)
+        normalize_group_member_sizes(members, group)
+        alignment = infer_group_alignment(group, members)
+        if alignment == "row":
+            normalize_group_members(members, "row", group)
+        elif alignment == "column":
+            normalize_group_members(members, "column", group)
+    normalize_group_phase_baselines(groups, grouped)
+    autosize_groups(nodes_list, groups, memberships)
     return memberships
 
 
@@ -832,6 +1146,7 @@ def avoid_edge_node_overlaps(
     width: float,
     min_top: float = 0.0,
     margin: float = EDGE_NODE_MARGIN,
+    memberships: dict[str, dict] | None = None,
 ) -> None:
     if not nodes_list or not edges:
         return
@@ -855,6 +1170,8 @@ def avoid_edge_node_overlaps(
         for node in nodes_list:
             node_id = node["id"]
             if node_id not in displacement:
+                continue
+            if memberships and is_grid_locked_group(memberships.get(node_id)):
                 continue
             dx, dy, weight = displacement[node_id]
             length = math.hypot(dx, dy)
@@ -1142,25 +1459,27 @@ def render_header(spec: dict, metrics: dict[str, float]) -> str:
     return "\n".join(parts)
 
 
-def render_groups(groups: list[dict]) -> str:
-    parts: list[str] = []
-    for group in groups:
-        x = float(group["x"])
-        y = float(group["y"])
-        w = float(group["w"])
-        h = float(group["h"])
-        title = escape(group.get("title", ""))
+def render_group(group: dict, members: list[dict]) -> str:
+    x = float(group["x"])
+    y = float(group["y"])
+    w = float(group["w"])
+    h = float(group["h"])
+    title = escape(group.get("title", ""))
+    parts = [
+        f'<g class="group" id="group-{escape(group.get("id", title or "group"))}">'
+    ]
+    parts.append(
+        f'<path class="group-frame" d="{rounded_rect_path(x, y, w, h, 28)}" />'
+    )
+    if title:
         parts.append(
-            f'<g class="group" id="group-{escape(group.get("id", title or "group"))}">'
+            f'<text class="group-title" x="{fmt(x + 22)}" y="{fmt(y + 34)}">{title}</text>'
         )
-        parts.append(
-            f'<path class="group-frame" d="{rounded_rect_path(x, y, w, h, 28)}" />'
-        )
-        if title:
-            parts.append(
-                f'<text class="group-title" x="{fmt(x + 22)}" y="{fmt(y + 34)}">{title}</text>'
-            )
+    if members:
+        parts.append('<g class="group-nodes">')
+        parts.extend(render_node(node) for node in members)
         parts.append("</g>")
+    parts.append("</g>")
     return "\n".join(parts)
 
 
@@ -1509,17 +1828,18 @@ def render_edge(
     return "\n".join(parts)
 
 
-def render_svg(spec: dict) -> str:
+def layout_diagram(spec: dict) -> dict[str, object]:
     width = int(spec.get("width", 1440))
     height = int(spec.get("height", 900))
-    title = escape(spec.get("title", "SVG flow diagram"))
-    subtitle = escape(spec.get("subtitle", "Animated pipeline diagram"))
+    title = str(spec.get("title", "SVG flow diagram"))
+    subtitle = str(spec.get("subtitle", "Animated pipeline diagram"))
     theme = dict(DEFAULT_THEME)
     theme.update(spec.get("theme", {}))
     metrics = header_metrics(spec)
     nodes_list = [dict(node) for node in spec.get("nodes", [])]
     groups = [dict(group) for group in spec.get("groups", [])]
-    edges = spec.get("edges", [])
+    seed_group_boxes(nodes_list, groups)
+    edges = [dict(edge) for edge in spec.get("edges", [])]
     min_content_y = min(
         [float(node["y"]) for node in nodes_list]
         + [float(group["y"]) for group in groups]
@@ -1537,29 +1857,39 @@ def render_svg(spec: dict) -> str:
             for group in groups:
                 group["y"] = float(group["y"]) + delta
     memberships = align_nodes_within_groups(nodes_list, groups)
+    autosize_groups(nodes_list, groups, memberships)
     normalize_node_spacing_2d(nodes_list)
     enforce_edge_label_corridors(nodes_list, edges)
-    clamp_nodes_to_groups(nodes_list, groups, memberships)
+    autosize_groups(nodes_list, groups, memberships)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
     avoid_edge_node_overlaps(
         nodes_list,
         edges,
         float(width),
         min_top=min_top,
+        memberships=memberships,
     )
     memberships = align_nodes_within_groups(nodes_list, groups)
+    autosize_groups(nodes_list, groups, memberships)
     normalize_node_spacing_2d(nodes_list)
     normalize_node_vertical_spacing(nodes_list)
     enforce_edge_label_corridors(nodes_list, edges)
-    clamp_nodes_to_groups(nodes_list, groups, memberships)
+    autosize_groups(nodes_list, groups, memberships)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
     memberships = align_nodes_within_groups(nodes_list, groups)
+    autosize_groups(nodes_list, groups, memberships)
     enforce_edge_label_corridors(nodes_list, edges)
-    clamp_nodes_to_groups(nodes_list, groups, memberships)
+    autosize_groups(nodes_list, groups, memberships)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
     memberships = align_nodes_within_groups(nodes_list, groups)
-    clamp_nodes_to_groups(nodes_list, groups, memberships)
+    autosize_groups(nodes_list, groups, memberships)
     clamp_nodes_to_canvas(nodes_list, float(width), min_top=min_top, clamp_right=False)
+    shift_content_into_canvas(
+        nodes_list,
+        groups,
+        min_left=CANVAS_SIDE_PADDING,
+        min_top=min_top,
+    )
     content_right = max(
         [float(node["x"]) + float(node["w"]) for node in nodes_list]
         + [float(group["x"]) + float(group["w"]) for group in groups]
@@ -1573,13 +1903,59 @@ def render_svg(spec: dict) -> str:
     )
     height = max(height, int(math.ceil(content_bottom + CANVAS_BOTTOM_PADDING)))
     nodes = {node["id"]: node for node in nodes_list}
+    grouped_nodes: dict[str, list[dict]] = {}
+    grouped_node_ids: set[str] = set()
+    for node in nodes_list:
+        group = memberships.get(node["id"])
+        if not group:
+            continue
+        grouped_nodes.setdefault(str(group["id"]), []).append(node)
+        grouped_node_ids.add(node["id"])
+    edge_geometries = layout_edge_geometries(edges, nodes)
+    edge_label_layouts = layout_edge_labels(edges, edge_geometries, nodes, width, height)
+    return {
+        "width": width,
+        "height": height,
+        "title": title,
+        "subtitle": subtitle,
+        "theme": theme,
+        "metrics": metrics,
+        "nodes_list": nodes_list,
+        "groups": groups,
+        "edges": edges,
+        "nodes": nodes,
+        "memberships": memberships,
+        "grouped_nodes": grouped_nodes,
+        "grouped_node_ids": grouped_node_ids,
+        "edge_geometries": edge_geometries,
+        "edge_label_layouts": edge_label_layouts,
+    }
+
+
+def render_svg(spec: dict) -> str:
+    layout = layout_diagram(spec)
+    width = int(layout["width"])
+    height = int(layout["height"])
+    title = escape(layout["title"])
+    subtitle = escape(layout["subtitle"])
+    theme = dict(layout["theme"])
+    metrics = dict(layout["metrics"])
+    groups = list(layout["groups"])
+    nodes_list = list(layout["nodes_list"])
+    edges = list(layout["edges"])
+    grouped_nodes = dict(layout["grouped_nodes"])
+    grouped_node_ids = set(layout["grouped_node_ids"])
+    edge_geometries = list(layout["edge_geometries"])
+    edge_label_layouts = list(layout["edge_label_layouts"])
     theme_css = "\n".join(
         f"      --{key.replace('_', '-')}: {value};" for key, value in theme.items()
     )
-
-    node_markup = "\n".join(render_node(node) for node in nodes_list)
-    edge_geometries = layout_edge_geometries(edges, nodes)
-    edge_label_layouts = layout_edge_labels(edges, edge_geometries, nodes, width, height)
+    group_markup = "\n".join(
+        render_group(group, grouped_nodes.get(str(group["id"]), [])) for group in groups
+    )
+    ungrouped_node_markup = "\n".join(
+        render_node(node) for node in nodes_list if node["id"] not in grouped_node_ids
+    )
     edge_markup = "\n".join(
         render_edge(edge, index, edge_geometries[index], edge_label_layouts[index])
         for index, edge in enumerate(edges)
@@ -1714,15 +2090,322 @@ def render_svg(spec: dict) -> str:
   <rect class="canvas-bg" x="0" y="0" width="{width}" height="{height}" />
   <rect class="canvas-grain" x="0" y="0" width="{width}" height="{height}" />
   {render_header(spec, metrics)}
-  {render_groups(groups)}
   <g class="edges">
     {edge_markup}
   </g>
+  <g class="groups">
+    {group_markup}
+  </g>
   <g class="nodes">
-    {node_markup}
+    {ungrouped_node_markup}
   </g>
 </svg>
 """
+
+
+def drawio_html_label(text: str | None, caption: str | None = None) -> str:
+    body = "<br/>".join(html.escape(line) for line in text_lines(text) or [" "])
+    parts = [
+        "<div style='font-size:18px;font-weight:600;line-height:1.25;'>",
+        body,
+        "</div>",
+    ]
+    if caption:
+        parts.extend(
+            [
+                "<div style='margin-top:6px;font-size:11px;font-weight:700;color:#7A6F66;text-transform:uppercase;'>",
+                html.escape(caption),
+                "</div>",
+            ]
+        )
+    return "".join(parts)
+
+
+def drawio_text_style(font_size: int, color: str, bold: bool = False) -> str:
+    style = [
+        "text",
+        "html=1",
+        "strokeColor=none",
+        "fillColor=none",
+        "align=left",
+        "verticalAlign=top",
+        "whiteSpace=wrap",
+        f"fontSize={font_size}",
+        f"fontColor={color}",
+    ]
+    if bold:
+        style.append("fontStyle=1")
+    return ";".join(style) + ";"
+
+
+def drawio_node_style(node: dict, theme: dict[str, str]) -> str:
+    tone = str(node.get("tone", "sand"))
+    fill = theme.get(TONE_TO_FILL.get(tone, "sand"), DEFAULT_THEME["sand"])
+    style = [
+        "whiteSpace=wrap",
+        "html=1",
+        f"fillColor={fill}",
+        f"strokeColor={theme['ink']}",
+        "strokeWidth=2",
+        "fontSize=16",
+        f"fontColor={theme['ink']}",
+        "align=center",
+        "verticalAlign=middle",
+        "rounded=1",
+        "arcSize=18",
+    ]
+    shape = str(node.get("shape", "rect"))
+    if shape == "pill":
+        style.append("arcSize=50")
+    elif shape == "diamond":
+        style.extend(["shape=rhombus", "rounded=0"])
+    return ";".join(style) + ";"
+
+
+def drawio_group_style(theme: dict[str, str]) -> str:
+    return (
+        "swimlane;html=1;rounded=1;arcSize=12;horizontal=0;"
+        "startSize=34;swimlaneFillColor=none;fillColor=none;"
+        f"strokeColor={theme['grid']};fontColor={theme['muted']};"
+        "fontSize=13;fontStyle=1;dashed=1;dashPattern=10 12;"
+        "container=1;collapsible=0;recursiveResize=0;"
+    )
+
+
+def drawio_anchor(side: str) -> tuple[str, str] | None:
+    return {
+        "left": ("0", "0.5"),
+        "right": ("1", "0.5"),
+        "top": ("0.5", "0"),
+        "bottom": ("0.5", "1"),
+    }.get(side)
+
+
+def drawio_edge_style(edge: dict, theme: dict[str, str]) -> str:
+    tone = str(edge.get("tone", "sky"))
+    flow_key = TONE_TO_FLOW.get(tone, "flow-sky").replace("-", "_")
+    stroke = theme.get(flow_key, DEFAULT_THEME["flow_sky"])
+    kind = str(edge.get("kind", "primary"))
+    width = "3" if kind == "primary" else "2"
+    style = [
+        "curved=1",
+        "rounded=1",
+        "orthogonalLoop=1",
+        "jettySize=auto",
+        "html=1",
+        f"strokeColor={stroke}",
+        f"strokeWidth={width}",
+        "dashed=1",
+        "dashPattern=8 8",
+        "endArrow=blockThin",
+        "endFill=0",
+        "labelBackgroundColor=#FCFBF7",
+        "fontSize=12",
+        f"fontColor={theme['ink']}",
+    ]
+    if kind == "feedback":
+        style.append("endArrow=open")
+    from_anchor = drawio_anchor(str(edge.get("fromSide", "")))
+    if from_anchor:
+        style.extend(
+            [
+                f"exitX={from_anchor[0]}",
+                f"exitY={from_anchor[1]}",
+                "exitPerimeter=1",
+            ]
+        )
+    to_anchor = drawio_anchor(str(edge.get("toSide", "")))
+    if to_anchor:
+        style.extend(
+            [
+                f"entryX={to_anchor[0]}",
+                f"entryY={to_anchor[1]}",
+                "entryPerimeter=1",
+            ]
+        )
+    return ";".join(style) + ";"
+
+
+def render_drawio(spec: dict) -> str:
+    layout = layout_diagram(spec)
+    width = int(layout["width"])
+    height = int(layout["height"])
+    title = str(layout["title"])
+    subtitle = str(layout["subtitle"])
+    theme = dict(layout["theme"])
+    groups = list(layout["groups"])
+    nodes_list = list(layout["nodes_list"])
+    edges = list(layout["edges"])
+    memberships = dict(layout["memberships"])
+
+    mxfile = ET.Element(
+        "mxfile",
+        attrib={
+            "host": "app.diagrams.net",
+            "type": "device",
+            "compressed": "false",
+        },
+    )
+    diagram = ET.SubElement(
+        mxfile,
+        "diagram",
+        attrib={"id": "svg-flow-diagram", "name": title or "Page-1"},
+    )
+    model = ET.SubElement(
+        diagram,
+        "mxGraphModel",
+        attrib={
+            "dx": "1600",
+            "dy": "900",
+            "grid": "1",
+            "gridSize": "10",
+            "guides": "1",
+            "tooltips": "1",
+            "connect": "1",
+            "arrows": "1",
+            "fold": "1",
+            "page": "1",
+            "pageScale": "1",
+            "pageWidth": str(max(850, width)),
+            "pageHeight": str(max(1100, height)),
+            "math": "0",
+            "shadow": "0",
+        },
+    )
+    root = ET.SubElement(model, "root")
+    ET.SubElement(root, "mxCell", attrib={"id": "0"})
+    ET.SubElement(root, "mxCell", attrib={"id": "1", "parent": "0"})
+
+    if title:
+        title_cell = ET.SubElement(
+            root,
+            "mxCell",
+            attrib={
+                "id": "title",
+                "value": html.escape(title),
+                "style": drawio_text_style(26, theme["ink"], bold=True),
+                "vertex": "1",
+                "parent": "1",
+            },
+        )
+        ET.SubElement(
+            title_cell,
+            "mxGeometry",
+            attrib={
+                "x": "72",
+                "y": "54",
+                "width": str(max(320, width - 144)),
+                "height": "34",
+                "as": "geometry",
+            },
+        )
+    if subtitle:
+        subtitle_cell = ET.SubElement(
+            root,
+            "mxCell",
+            attrib={
+                "id": "subtitle",
+                "value": html.escape(subtitle),
+                "style": drawio_text_style(14, theme["muted"]),
+                "vertex": "1",
+                "parent": "1",
+            },
+        )
+        ET.SubElement(
+            subtitle_cell,
+            "mxGeometry",
+            attrib={
+                "x": "72",
+                "y": "92",
+                "width": str(max(320, width - 144)),
+                "height": "24",
+                "as": "geometry",
+            },
+        )
+
+    for group in groups:
+        group_id = f"group-{group['id']}"
+        group_cell = ET.SubElement(
+            root,
+            "mxCell",
+            attrib={
+                "id": group_id,
+                "value": str(group.get("title", "")),
+                "style": drawio_group_style(theme),
+                "vertex": "1",
+                "connectable": "0",
+                "parent": "1",
+            },
+        )
+        ET.SubElement(
+            group_cell,
+            "mxGeometry",
+            attrib={
+                "x": fmt(float(group["x"])),
+                "y": fmt(float(group["y"])),
+                "width": fmt(float(group["w"])),
+                "height": fmt(float(group["h"])),
+                "as": "geometry",
+            },
+        )
+
+    for node in nodes_list:
+        parent = "1"
+        x = float(node["x"])
+        y = float(node["y"])
+        group = memberships.get(node["id"])
+        if group:
+            parent = f"group-{group['id']}"
+            x -= float(group["x"])
+            y -= float(group["y"])
+        node_cell = ET.SubElement(
+            root,
+            "mxCell",
+            attrib={
+                "id": f"node-{node['id']}",
+                "value": drawio_html_label(
+                    str(node.get("label", "")),
+                    str(node.get("caption", "")).strip() or None,
+                ),
+                "style": drawio_node_style(node, theme),
+                "vertex": "1",
+                "parent": parent,
+            },
+        )
+        ET.SubElement(
+            node_cell,
+            "mxGeometry",
+            attrib={
+                "x": fmt(x),
+                "y": fmt(y),
+                "width": fmt(float(node["w"])),
+                "height": fmt(float(node["h"])),
+                "as": "geometry",
+            },
+        )
+
+    for index, edge in enumerate(edges):
+        edge_cell = ET.SubElement(
+            root,
+            "mxCell",
+            attrib={
+                "id": f"edge-{index}",
+                "value": html.escape(str(edge.get("label", ""))) if edge.get("label") else "",
+                "style": drawio_edge_style(edge, theme),
+                "edge": "1",
+                "parent": "1",
+                "source": f"node-{edge['from']}",
+                "target": f"node-{edge['to']}",
+            },
+        )
+        ET.SubElement(edge_cell, "mxGeometry", attrib={"relative": "1", "as": "geometry"})
+
+    if hasattr(ET, "indent"):
+        ET.indent(mxfile, space="  ")
+    return (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        + ET.tostring(mxfile, encoding="unicode")
+    )
 
 
 def flatten_svg_colors(svg_text: str) -> str:
@@ -1768,6 +2451,10 @@ def main() -> None:
             print(f"Wrote {flat_svg_path}")
         tool = export_png(flat_svg_path, png_path)
         print(f"Wrote {png_path} via {tool}")
+    if args.drawio_out:
+        drawio_path = Path(args.drawio_out)
+        drawio_path.write_text(render_drawio(spec))
+        print(f"Wrote {drawio_path}")
 
 
 if __name__ == "__main__":

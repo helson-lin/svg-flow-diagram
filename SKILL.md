@@ -1,19 +1,50 @@
 ---
 name: svg-flow-diagram
-description: Create or revise standalone SVG flowcharts, process maps, architecture diagrams, and pipeline diagrams with dashed animated flow lines and an Excalidraw-like hand-drawn visual language. Use when Codex needs raw `.svg` output rather than Mermaid, HTML, or Figma, especially for requests mentioning SVG flowcharts, node-link diagrams, flowing connectors, animated pipelines, or Extradraw/Excalidraw-style visuals.
+description: Create or revise standalone flowcharts, process maps, architecture diagrams, and pipeline diagrams with dashed animated flow lines and an Excalidraw-like hand-drawn visual language. Use when Codex needs raw `.svg` or editable `.drawio` / draw.io / diagrams.net output rather than Mermaid, HTML, or Figma, especially for requests mentioning SVG flowcharts, node-link diagrams, flowing connectors, animated pipelines, draw.io files, or Extradraw/Excalidraw-style visuals.
 ---
 
 # SVG Flow Diagram
 
-Create standalone SVG diagrams with dashed animated flow connectors and a sketchy visual system inspired by Excalidraw.
+Create standalone SVG and draw.io diagrams with dashed animated flow connectors and a sketchy visual system inspired by Excalidraw.
+
+## Triggering
+
+This skill should trigger in two cases:
+
+- The user explicitly names `$svg-flow-diagram`.
+- The request clearly asks for a flowchart, process map, architecture diagram, pipeline diagram, node-link diagram, or editable draw.io / diagrams.net diagram, and raw diagram output is a better fit than Mermaid, HTML, Figma, or prose.
+
+Bias toward triggering when the user mentions any of these:
+
+- `svg`
+- `drawio`, `draw.io`, `diagrams.net`, `.drawio`
+- `流程图`, `架构图`, `节点图`, `管线图`, `时序图风格的流程图`
+
+Do not trigger when the user clearly wants:
+
+- Mermaid source
+- a Figma file
+- an HTML/CSS or Canvas implementation
+- a screenshot or bitmap-only illustration with no diagram structure
+
+## Default Output
+
+Default to writing an `.svg` file.
+
+Upgrade the output set based on the request:
+
+- If the user wants chat preview or an image deliverable, also export `.png` and keep the `.svg`.
+- If the user wants editability in draw.io / diagrams.net, also export `.drawio`.
+- If the user wants both preview and editability, export `.svg` + `.png` + `.drawio` and add `.flat.svg` when PNG export needs flattened colors.
 
 ## Quick Start
 
 1. Translate the request into a diagram spec: canvas size, groups, nodes, edges, and notes.
 2. Use the bundled renderer at the skill path when building a fresh diagram or iterating on layout several times.
 3. If the user needs an image in chat, keep the SVG and also generate a PNG preview from a flattened-color SVG.
-4. Patch the SVG directly only for small label, spacing, or color edits.
-5. Open references only when needed:
+4. If the user needs an editable diagrams.net / draw.io file, export a `.drawio` artifact from the same spec.
+5. Patch the SVG directly only for small label, spacing, or color edits.
+6. Open references only when needed:
 - `references/style-guide.md` for palette, typography, node, and motion rules
 - `references/svg-recipes.md` for the JSON spec format and reusable SVG patterns
 
@@ -156,6 +187,17 @@ python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
 
 Keep the original SVG, use the PNG for preview/sending, and tell the user where both files were written.
 
+When the user needs an editable draw.io artifact, add `--drawio-out`:
+
+```bash
+python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
+  /absolute/path/to/spec.json \
+  /absolute/path/to/output.svg \
+  --drawio-out /absolute/path/to/output.drawio
+```
+
+If the user asks for both a visual deliverable and an editable diagram, write all four artifacts in one pass: `.svg`, `.flat.svg`, `.png`, and `.drawio`.
+
 When the user supplies an explicit skill path, prefer that exact location:
 
 ```bash
@@ -167,7 +209,7 @@ python3 "$SKILL_DIR/scripts/render_flow_svg.py" \
 
 Use the example spec at `"$SKILL_DIR/assets/example-spec.json"` as the starter format.
 
-If the renderer script is missing, skip the script flow and generate the SVG directly in the task workspace by following this skill's house style and the JSON shape documented in `references/svg-recipes.md`. If `base-template.svg` exists, copy and adapt it. If it does not exist, write a standalone SVG from scratch.
+If the renderer script is missing, skip the script flow and generate the SVG directly in the task workspace by following this skill's house style and the JSON shape documented in `references/svg-recipes.md`. If `base-template.svg` exists, copy and adapt it. If it does not exist, write a standalone SVG from scratch. Only promise `.drawio` output when the bundled renderer is available, because draw.io export is script-backed.
 
 Supported top-level fields:
 
@@ -185,6 +227,7 @@ Supported node fields:
 
 - `id`, `label`, `caption`
 - `x`, `y`, `w`, `h`
+- `group`: preferred group membership field; point it at a `groups[].id`
 - `lane` or `phase`: optional structural placement hints
 - `column`: optional ordering hint for left-to-right diagrams
 - `role`: `entry`, `core`, `support`, `decision`, `external`, `exit`
@@ -192,6 +235,27 @@ Supported node fields:
 - `shape`: `rect`, `pill`, `diamond`
 
 Always decide node `role` before choosing tone or shape. Let the role drive emphasis, not the other way around.
+
+Supported group fields:
+
+- `id`, `title`
+- `x`, `y`, `w`, `h`: optional seed placement hints for early layout passes
+- `align`: optional override, use `row`, `column`, or `auto`
+- `gap`: optional minimum spacing override between members in a `row` or `column`
+- `phase`: optional phase key used to align multiple groups onto a shared baseline
+- `uniformSize`: optional boolean; set `false` to preserve per-node sizes inside the group
+
+Prefer explicit `node.group` membership over relying on a node's center point landing inside a group rectangle. Treat `groups[].x/y/w/h` as coarse placement hints, not the final rendered bounds. The renderer sizes each group from its member nodes with built-in inner padding, and the emitted SVG nests member node `<g>` elements inside the corresponding group `<g>`.
+
+Within a group, keep single-row groups on one horizontal center line and single-column groups on one vertical center line. The renderer auto-detects that from the rough input placement, then normalizes the whole member sequence into a cleaner flowchart layout: row groups share one y-center and are re-distributed left-to-right, column groups share one x-center and are re-distributed top-to-bottom. Mixed layouts are left alone. Set `groups[].align` to `row` or `column` when you need to force the result, and use `groups[].gap` when the default spacing is too tight.
+
+For more standard enterprise-style flowcharts:
+
+- aligned groups default to uniform member sizing by shape, so parallel step nodes stop drifting in height or width
+- groups with the same `phase` share a baseline: column groups align their top-most node, row groups align their left-most node
+- once a group is normalized into a row or column, edge-overlap cleanup avoids moving those nodes off the grid
+
+The renderer treats `w` and `h` as **minimums**: if the label or caption cannot fit at a readable size, the node is auto-grown (capped at 360x180) so the text is never silently truncated. Pill and diamond shapes get extra interior padding because their geometry eats horizontal space. You can still pass tight w/h values to express layout intent — just expect the node to grow if needed.
 
 Supported edge fields:
 
@@ -203,6 +267,12 @@ Supported edge fields:
 - `duration`
 
 Treat `kind` as mandatory during planning even if the current renderer only consumes `tone`. Keep one dominant `primary` chain, no more than two `secondary` branches, and at most one `feedback` loop unless the user explicitly asks for a denser systems map.
+
+For draw.io output, keep these expectations:
+
+- preserve editability and grouping over perfect sketch-style fidelity
+- keep nodes, groups, titles, and edge labels editable as native draw.io cells
+- keep the same rough layout and group membership as the SVG output from the same spec
 
 ## References
 
